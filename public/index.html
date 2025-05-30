@@ -1,0 +1,1236 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>回声 (Huisheen) - 通知接收平台</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.ico">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script>
+        // Tailwind CSS dark mode configuration
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
+    <style>
+        [v-cloak] { display: none; }
+        .notification-enter-active, .notification-leave-active {
+            transition: all 0.3s ease;
+        }
+        .notification-enter-from, .notification-leave-to {
+            opacity: 0;
+            transform: translateY(-20px);
+        }
+        .theme-transition {
+            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+        }
+
+        /* 弹窗动画 */
+        .modal-enter-active, .modal-leave-active {
+            transition: opacity 0.3s ease;
+        }
+        .modal-enter-from, .modal-leave-to {
+            opacity: 0;
+        }
+
+        .modal-content-enter-active {
+            transition: all 0.3s ease;
+        }
+        .modal-content-leave-active {
+            transition: all 0.2s ease;
+        }
+        .modal-content-enter-from {
+            opacity: 0;
+            transform: scale(0.9) translateY(-20px);
+        }
+        .modal-content-leave-to {
+            opacity: 0;
+            transform: scale(0.95) translateY(-10px);
+        }
+
+        /* 确认弹窗特殊动画 */
+        .modal-content-enter-active .bg-red-100,
+        .modal-content-enter-active .bg-blue-100 {
+            animation: pulse 0.6s ease-in-out;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        /* 移动端菜单动画 */
+        .mobile-menu-enter-active, .mobile-menu-leave-active {
+            transition: transform 0.25s ease, opacity 0.25s ease;
+            transform-origin: top;
+            overflow: hidden;
+            will-change: transform, opacity;
+        }
+        .mobile-menu-enter-from {
+            transform: scaleY(0);
+            opacity: 0;
+        }
+        .mobile-menu-leave-to {
+            transform: scaleY(0);
+            opacity: 0;
+        }
+
+        /* GPU加速优化 */
+        .mobile-menu-enter-active *,
+        .mobile-menu-leave-active * {
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+        }
+
+        /* 响应式优化 */
+        @media (max-width: 640px) {
+            .container {
+                padding: 1rem;
+            }
+            
+            .notification-card {
+                margin: 0.5rem 0;
+            }
+            
+            .stat-card {
+                padding: 1rem;
+            }
+        }
+
+        /* 平滑过渡动画 */
+        .fade-enter-active, .fade-leave-active {
+            transition: opacity 0.3s ease;
+        }
+        .fade-enter-from, .fade-leave-to {
+            opacity: 0;
+        }
+
+        /* 文本截断 */
+        .line-clamp-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .line-clamp-3 {
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* 自定义下拉组件样式 */
+        .custom-dropdown .dropdown-menu {
+            animation: dropdown-appear 0.15s ease-out;
+        }
+
+        @keyframes dropdown-appear {
+            from {
+                opacity: 0;
+                transform: translateY(-8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* 下拉菜单滚动条样式 */
+        .custom-dropdown .dropdown-menu::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .custom-dropdown .dropdown-menu::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .custom-dropdown .dropdown-menu::-webkit-scrollbar-thumb {
+            background: rgba(156, 163, 175, 0.5);
+            border-radius: 2px;
+        }
+
+        .custom-dropdown .dropdown-menu::-webkit-scrollbar-thumb:hover {
+            background: rgba(156, 163, 175, 0.8);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 min-h-screen theme-transition" :class="{ 'dark': darkMode }">
+    <div id="app" v-cloak>
+        <!-- 导航栏 -->
+        <nav class="bg-white dark:bg-gray-800 shadow-lg border-b border-gray-200 dark:border-gray-700 theme-transition">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-16">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0 flex items-center">
+                            <i class="fas fa-bell text-2xl text-blue-600 dark:text-blue-400 mr-3"></i>
+                            <h1 class="text-xl font-bold text-gray-900 dark:text-white">回声 (Huisheen)</h1>
+                        </div>
+                    </div>
+                    
+                    <!-- 桌面端导航 -->
+                    <div class="hidden md:flex items-center space-x-4">
+                        <!-- 文档链接 -->
+                        <a href="/docs.html" class="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                            <i class="fas fa-book mr-2"></i>文档
+                        </a>
+                        
+                        <!-- 夜间模式切换按钮 -->
+                        <button @click="toggleDarkMode" 
+                                class="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 p-2 rounded-md transition-colors"
+                                :title="darkMode ? '切换到日间模式' : '切换到夜间模式'">
+                            <i v-if="darkMode" class="fas fa-sun text-xl"></i>
+                            <i v-else class="fas fa-moon text-xl"></i>
+                        </button>
+                        
+                        <template v-if="user">
+                            <span class="text-gray-700 dark:text-gray-300">欢迎，{{ user.username }}</span>
+                            <button @click="logout" class="bg-gray-500 dark:bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-600 dark:hover:bg-gray-700 transition">
+                                退出登录
+                            </button>
+                        </template>
+                        <template v-else>
+                            <button @click="showLogin = true" class="bg-blue-500 dark:bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-600 dark:hover:bg-blue-700 transition">
+                                登录
+                            </button>
+                            <button @click="showRegister = true" class="bg-green-500 dark:bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-600 dark:hover:bg-green-700 transition">
+                                注册
+                            </button>
+                        </template>
+                    </div>
+
+                    <!-- 移动端菜单按钮 -->
+                    <div class="md:hidden flex items-center space-x-2">
+                        <!-- 夜间模式切换按钮 -->
+                        <button @click="toggleDarkMode" 
+                                class="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 p-2 rounded-md transition-colors">
+                            <i v-if="darkMode" class="fas fa-sun text-lg"></i>
+                            <i v-else class="fas fa-moon text-lg"></i>
+                        </button>
+                        
+                        <!-- 汉堡菜单按钮 -->
+                        <button @click="showMobileMenu = !showMobileMenu" 
+                                class="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 p-2 rounded-md transition-colors">
+                            <i class="fas fa-bars text-lg"></i>
+                        </button>
+                </div>
+                </div>
+
+                <!-- 移动端菜单 -->
+                <transition name="mobile-menu">
+                    <div v-if="showMobileMenu" class="md:hidden border-t border-gray-200 dark:border-gray-700 py-4 bg-white dark:bg-gray-800">
+                        <div class="space-y-2">
+                            <!-- 文档链接 -->
+                            <a href="/docs.html" @click="showMobileMenu = false"
+                               class="block w-full text-left px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+                                <i class="fas fa-book mr-2"></i>文档中心
+                            </a>
+                            
+                            <template v-if="user">
+                                <div class="px-4 py-2 text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">
+                                    欢迎，{{ user.username }}
+                                </div>
+                                <button @click="logout; showMobileMenu = false" 
+                                        class="block w-full text-left px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+                                    <i class="fas fa-sign-out-alt mr-2"></i>退出登录
+                                </button>
+                            </template>
+                            <template v-else>
+                                <button @click="showLogin = true; showMobileMenu = false" 
+                                        class="block w-full text-left px-4 py-2 text-blue-600 dark:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+                                    <i class="fas fa-sign-in-alt mr-2"></i>登录
+                                </button>
+                                <button @click="showRegister = true; showMobileMenu = false" 
+                                        class="block w-full text-left px-4 py-2 text-green-600 dark:text-green-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+                                    <i class="fas fa-user-plus mr-2"></i>注册
+                                </button>
+                            </template>
+                        </div>
+                    </div>
+                </transition>
+            </div>
+        </nav>
+
+        <!-- 主内容区域 -->
+        <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+            <!-- 未登录状态 -->
+            <div v-if="!user" class="space-y-12">
+                <!-- Hero 区域 -->
+                <div class="text-center py-8 sm:py-12">
+                    <div class="mb-8">
+                        <i class="fas fa-bell text-6xl sm:text-8xl text-blue-500 dark:text-blue-400 mb-6 animate-pulse"></i>
+                    </div>
+                    <h1 class="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-4">
+                        回声 (Huisheen)
+                    </h1>
+                    <p class="text-lg sm:text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-3xl mx-auto leading-relaxed">
+                        专注于通知接收的开源服务平台，支持主动和被动两种订阅模式，让您不再错过任何重要信息
+                    </p>
+                    <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                        <button @click="showRegister = true" 
+                                class="w-full sm:w-auto bg-blue-600 dark:bg-blue-700 text-white px-8 py-3 rounded-lg text-lg font-semibold hover:bg-blue-700 dark:hover:bg-blue-800 transition transform hover:scale-105">
+                            <i class="fas fa-rocket mr-2"></i>立即开始
+                        </button>
+                        <button @click="showLogin = true" 
+                                class="w-full sm:w-auto border-2 border-blue-600 dark:border-blue-500 text-blue-600 dark:text-blue-400 px-8 py-3 rounded-lg text-lg font-semibold hover:bg-blue-50 dark:hover:bg-blue-900/30 transition">
+                            <i class="fas fa-sign-in-alt mr-2"></i>登录账户
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 项目介绍 -->
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 sm:p-8 border dark:border-gray-700 theme-transition">
+                    <div class="text-center mb-8">
+                        <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-4">
+                            <i class="fas fa-heart text-red-500 mr-3"></i>公益开源项目
+                        </h2>
+                        <p class="text-gray-600 dark:text-gray-300 max-w-4xl mx-auto leading-relaxed">
+                            回声是一个完全免费的公益项目，旨在为开发者和用户提供统一的通知管理解决方案。
+                            我们相信信息的及时传达应该是每个人都能享受的基础服务。
+                        </p>
+            </div>
+
+                    <div class="grid md:grid-cols-3 gap-6 sm:gap-8">
+                        <div class="text-center">
+                            <div class="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <i class="fas fa-gift text-2xl text-green-600 dark:text-green-400"></i>
+                            </div>
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">完全免费</h3>
+                            <p class="text-gray-600 dark:text-gray-300 text-sm">无需付费，无使用限制，永久免费使用所有功能</p>
+                        </div>
+                        <div class="text-center">
+                            <div class="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <i class="fab fa-github text-2xl text-blue-600 dark:text-blue-400"></i>
+                            </div>
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">开源透明</h3>
+                            <p class="text-gray-600 dark:text-gray-300 text-sm">源代码完全开放，欢迎贡献代码和提出建议</p>
+                        </div>
+                        <div class="text-center">
+                            <div class="w-16 h-16 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <i class="fas fa-users text-2xl text-purple-600 dark:text-purple-400"></i>
+                            </div>
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">社区驱动</h3>
+                            <p class="text-gray-600 dark:text-gray-300 text-sm">由开发者社区共同维护，持续改进和优化</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 功能特性 -->
+                <div class="grid md:grid-cols-2 gap-6 sm:gap-8">
+                    <div class="bg-white dark:bg-gray-800 p-6 sm:p-8 rounded-xl shadow-lg border dark:border-gray-700 theme-transition">
+                        <div class="flex items-start space-x-4">
+                                <div class="flex-shrink-0">
+                                <div class="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-code text-2xl text-green-600 dark:text-green-400"></i>
+                                </div>
+                                </div>
+                            <div class="flex-1">
+                                <h3 class="text-xl font-semibold mb-3 text-gray-900 dark:text-white">被动模式</h3>
+                                <p class="text-gray-600 dark:text-gray-300 mb-4 leading-relaxed">
+                                    提供API接口给第三方服务，回声平台会定期轮询获取最新通知。适用于无法主动推送的服务。
+                                </p>
+                                <div class="space-y-2 text-sm">
+                                    <div class="flex items-center text-gray-600 dark:text-gray-300">
+                                        <i class="fas fa-check text-green-500 mr-2"></i>
+                                        定时轮询，自动获取
+                            </div>
+                                    <div class="flex items-center text-gray-600 dark:text-gray-300">
+                                        <i class="fas fa-check text-green-500 mr-2"></i>
+                                        灵活配置轮询频率
+                        </div>
+                                    <div class="flex items-center text-gray-600 dark:text-gray-300">
+                                        <i class="fas fa-check text-green-500 mr-2"></i>
+                                        支持多种数据格式
+                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white dark:bg-gray-800 p-6 sm:p-8 rounded-xl shadow-lg border dark:border-gray-700 theme-transition">
+                        <div class="flex items-start space-x-4">
+                                <div class="flex-shrink-0">
+                                <div class="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-satellite-dish text-2xl text-blue-600 dark:text-blue-400"></i>
+                                </div>
+                                </div>
+                            <div class="flex-1">
+                                <h3 class="text-xl font-semibold mb-3 text-gray-900 dark:text-white">主动模式</h3>
+                                <p class="text-gray-600 dark:text-gray-300 mb-4 leading-relaxed">
+                                    获取唯一标识码，第三方服务可直接向回声平台推送通知。实时性更好，适用于即时通知场景。
+                                </p>
+                                <div class="space-y-2 text-sm">
+                                    <div class="flex items-center text-gray-600 dark:text-gray-300">
+                                        <i class="fas fa-check text-green-500 mr-2"></i>
+                                        实时推送，零延迟
+                            </div>
+                                    <div class="flex items-center text-gray-600 dark:text-gray-300">
+                                        <i class="fas fa-check text-green-500 mr-2"></i>
+                                        安全认证机制
+                        </div>
+                                    <div class="flex items-center text-gray-600 dark:text-gray-300">
+                                        <i class="fas fa-check text-green-500 mr-2"></i>
+                                        支持回调链接
+                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 使用场景 -->
+                <div class="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-700 rounded-xl p-6 sm:p-8 border dark:border-gray-600 theme-transition">
+                    <h2 class="text-2xl sm:text-3xl font-bold text-center text-gray-900 dark:text-white mb-8">
+                        <i class="fas fa-lightbulb text-yellow-500 mr-3"></i>适用场景
+                    </h2>
+                    <div class="grid md:grid-cols-3 gap-6">
+                        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border dark:border-gray-700">
+                            <div class="text-center mb-4">
+                                <i class="fas fa-server text-3xl text-blue-600 dark:text-blue-400"></i>
+                            </div>
+                            <h4 class="font-semibold text-gray-900 dark:text-white mb-2 text-center">系统监控</h4>
+                            <p class="text-sm text-gray-600 dark:text-gray-300 text-center">服务器状态、应用健康度、性能指标等系统通知</p>
+                        </div>
+                        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border dark:border-gray-700">
+                            <div class="text-center mb-4">
+                                <i class="fas fa-shopping-cart text-3xl text-green-600 dark:text-green-400"></i>
+                            </div>
+                            <h4 class="font-semibold text-gray-900 dark:text-white mb-2 text-center">业务通知</h4>
+                            <p class="text-sm text-gray-600 dark:text-gray-300 text-center">订单状态、支付通知、用户行为等业务消息</p>
+                        </div>
+                        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border dark:border-gray-700">
+                            <div class="text-center mb-4">
+                                <i class="fas fa-code-branch text-3xl text-purple-600 dark:text-purple-400"></i>
+                            </div>
+                            <h4 class="font-semibold text-gray-900 dark:text-white mb-2 text-center">开发协作</h4>
+                            <p class="text-sm text-gray-600 dark:text-gray-300 text-center">CI/CD状态、代码审查、部署结果等开发通知</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 快速开始 -->
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 sm:p-8 border dark:border-gray-700 theme-transition">
+                    <h2 class="text-2xl sm:text-3xl font-bold text-center text-gray-900 dark:text-white mb-8">
+                        <i class="fas fa-play text-green-500 mr-3"></i>快速开始
+                    </h2>
+                    <div class="max-w-4xl mx-auto">
+                        <div class="grid md:grid-cols-3 gap-6 sm:gap-8">
+                            <div class="text-center">
+                                <div class="w-12 h-12 bg-blue-600 dark:bg-blue-700 text-white rounded-full flex items-center justify-center mx-auto mb-4 text-xl font-bold">1</div>
+                                <h4 class="font-semibold text-gray-900 dark:text-white mb-2">注册账户</h4>
+                                <p class="text-sm text-gray-600 dark:text-gray-300">点击注册按钮，填写基本信息即可快速创建账户</p>
+                            </div>
+                            <div class="text-center">
+                                <div class="w-12 h-12 bg-green-600 dark:bg-green-700 text-white rounded-full flex items-center justify-center mx-auto mb-4 text-xl font-bold">2</div>
+                                <h4 class="font-semibold text-gray-900 dark:text-white mb-2">配置订阅</h4>
+                                <p class="text-sm text-gray-600 dark:text-gray-300">选择被动模式或主动模式，添加您的通知源</p>
+                            </div>
+                            <div class="text-center">
+                                <div class="w-12 h-12 bg-purple-600 dark:bg-purple-700 text-white rounded-full flex items-center justify-center mx-auto mb-4 text-xl font-bold">3</div>
+                                <h4 class="font-semibold text-gray-900 dark:text-white mb-2">接收通知</h4>
+                                <p class="text-sm text-gray-600 dark:text-gray-300">开始接收和管理来自各个源的通知信息</p>
+                            </div>
+                        </div>
+                        <div class="text-center mt-8">
+                            <button @click="showRegister = true" 
+                                    class="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-3 rounded-lg text-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition transform hover:scale-105 shadow-lg">
+                                <i class="fas fa-rocket mr-2"></i>立即注册，开始使用
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 页脚信息 -->
+                <div class="text-center py-8 border-t border-gray-200 dark:border-gray-700">
+                    <div class="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-6 text-gray-600 dark:text-gray-400">
+                            <div class="flex items-center">
+                            <i class="fab fa-github mr-2"></i>
+                            <span>开源项目</span>
+                                </div>
+                        <div class="flex items-center">
+                            <i class="fas fa-heart text-red-500 mr-2"></i>
+                            <span>公益免费</span>
+                                </div>
+                        <div class="flex items-center">
+                            <i class="fas fa-users mr-2"></i>
+                            <span>社区驱动</span>
+                            </div>
+                        </div>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-4">
+                        © 2025 回声 (Huisheen) - 让每个通知都有回声
+                    </p>
+                    </div>
+            </div>
+
+            <!-- 已登录状态 -->
+            <div v-if="user" class="space-y-6">
+                <!-- 统计卡片 -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-8">
+                    <div class="bg-white dark:bg-gray-800 p-4 md:p-6 rounded-lg shadow-md border dark:border-gray-700 theme-transition">
+                            <div class="flex items-center">
+                            <div class="w-10 h-10 md:w-12 md:h-12 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center mr-3 md:mr-4">
+                                <i class="fas fa-bell text-lg md:text-xl text-blue-600 dark:text-blue-400"></i>
+                                </div>
+                            <div>
+                                <p class="text-xs md:text-sm text-gray-600 dark:text-gray-400">总通知</p>
+                                <p class="text-lg md:text-2xl font-bold text-gray-900 dark:text-white">{{ totalNotifications }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    <div class="bg-white dark:bg-gray-800 p-4 md:p-6 rounded-lg shadow-md border dark:border-gray-700 theme-transition">
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 md:w-12 md:h-12 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center mr-3 md:mr-4">
+                                <i class="fas fa-exclamation-circle text-lg md:text-xl text-red-600 dark:text-red-400"></i>
+                            </div>
+                            <div>
+                                <p class="text-xs md:text-sm text-gray-600 dark:text-gray-400">未读</p>
+                                <p class="text-lg md:text-2xl font-bold text-gray-900 dark:text-white">{{ unreadNotifications }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white dark:bg-gray-800 p-4 md:p-6 rounded-lg shadow-md border dark:border-gray-700 theme-transition">
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 md:w-12 md:h-12 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center mr-3 md:mr-4">
+                                <i class="fas fa-clock text-lg md:text-xl text-green-600 dark:text-green-400"></i>
+                            </div>
+                            <div>
+                                <p class="text-xs md:text-sm text-gray-600 dark:text-gray-400">今日</p>
+                                <p class="text-lg md:text-2xl font-bold text-gray-900 dark:text-white">{{ todayNotifications }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white dark:bg-gray-800 p-4 md:p-6 rounded-lg shadow-md border dark:border-gray-700 theme-transition">
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 md:w-12 md:h-12 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center mr-3 md:mr-4">
+                                <i class="fas fa-link text-lg md:text-xl text-purple-600 dark:text-purple-400"></i>
+                            </div>
+                            <div>
+                                <p class="text-xs md:text-sm text-gray-600 dark:text-gray-400">订阅</p>
+                                <p class="text-lg md:text-2xl font-bold text-gray-900 dark:text-white">{{ totalSubscriptions }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 标签页导航 -->
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md border dark:border-gray-700 mb-6 md:mb-8 theme-transition">
+                    <!-- 移动端下拉选择 -->
+                    <div class="md:hidden p-4">
+                        <div class="relative custom-dropdown">
+                            <button @click="toggleDropdown('mobileTab')" 
+                                    class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-gray-900 dark:text-white text-left flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-600 transition">
+                                <span>{{ getTabDisplayText() }}</span>
+                                <i :class="dropdownStates.mobileTab ? 'fas fa-chevron-up' : 'fas fa-chevron-down'" class="text-sm text-gray-500 dark:text-gray-400"></i>
+                            </button>
+                            <div v-if="dropdownStates.mobileTab" class="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg dropdown-menu">
+                                <div class="py-1">
+                                    <button @click="selectTab('notifications')" 
+                                            :class="currentTab === 'notifications' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : ''"
+                                            class="w-full text-left px-3 py-3 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600 transition">
+                                        📢 通知管理
+                            </button>
+                                    <button @click="selectTab('subscriptions')" 
+                                            :class="currentTab === 'subscriptions' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : ''"
+                                            class="w-full text-left px-3 py-3 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600 transition">
+                                        🔗 订阅管理
+                            </button>
+                                    <button @click="selectTab('settings')" 
+                                            :class="currentTab === 'settings' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : ''"
+                                            class="w-full text-left px-3 py-3 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600 transition">
+                                        ⚙️ 账户设置
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 桌面端标签 -->
+                    <div class="hidden md:flex border-b border-gray-200 dark:border-gray-700">
+                        <button @click="currentTab = 'notifications'" 
+                                :class="{'border-b-2 border-blue-500 dark:border-blue-400 text-blue-600 dark:text-blue-400': currentTab === 'notifications'}"
+                                class="px-6 py-4 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition">
+                            <i class="fas fa-bell mr-2"></i>通知管理
+                                    </button>
+                        <button @click="currentTab = 'subscriptions'" 
+                                :class="{'border-b-2 border-blue-500 dark:border-blue-400 text-blue-600 dark:text-blue-400': currentTab === 'subscriptions'}"
+                                class="px-6 py-4 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition">
+                            <i class="fas fa-link mr-2"></i>订阅管理
+                                    </button>
+                        <button @click="currentTab = 'settings'" 
+                                :class="{'border-b-2 border-blue-500 dark:border-blue-400 text-blue-600 dark:text-blue-400': currentTab === 'settings'}"
+                                class="px-6 py-4 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition">
+                            <i class="fas fa-cog mr-2"></i>账户设置
+                                    </button>
+                    </div>
+
+                    <!-- 通知管理 -->
+                    <div v-if="currentTab === 'notifications'" class="p-4 md:p-6">
+                        <!-- 筛选和操作 -->
+                        <div class="mb-4 md:mb-6">
+                            <div class="flex flex-col sm:flex-row gap-4 mb-4">
+                                <!-- 筛选器 -->
+                                <div class="flex-1 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 md:gap-3">
+                                    <!-- 类型筛选 -->
+                                    <div class="relative custom-dropdown">
+                                        <button @click="toggleDropdown('type')" 
+                                                class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm text-gray-900 dark:text-white text-left flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-600 transition">
+                                            <span>{{ getFilterDisplayText('type') }}</span>
+                                            <i :class="dropdownStates.type ? 'fas fa-chevron-up' : 'fas fa-chevron-down'" class="text-xs text-gray-500 dark:text-gray-400"></i>
+                                        </button>
+                                        <div v-if="dropdownStates.type" class="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg dropdown-menu">
+                                            <div class="py-1">
+                                                <button @click="selectOption('type', '')" class="w-full text-left px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600 transition">全部类型</button>
+                                                <button @click="selectOption('type', 'info')" class="w-full text-left px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600 transition">信息</button>
+                                                <button @click="selectOption('type', 'success')" class="w-full text-left px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600 transition">成功</button>
+                                                <button @click="selectOption('type', 'warning')" class="w-full text-left px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600 transition">警告</button>
+                                                <button @click="selectOption('type', 'error')" class="w-full text-left px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600 transition">错误</button>
+                                            </div>
+                                </div>
+                            </div>
+                            
+                                    <!-- 优先级筛选 -->
+                                    <div class="relative custom-dropdown">
+                                        <button @click="toggleDropdown('priority')" 
+                                                class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm text-gray-900 dark:text-white text-left flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-600 transition">
+                                            <span>{{ getFilterDisplayText('priority') }}</span>
+                                            <i :class="dropdownStates.priority ? 'fas fa-chevron-up' : 'fas fa-chevron-down'" class="text-xs text-gray-500 dark:text-gray-400"></i>
+                                        </button>
+                                        <div v-if="dropdownStates.priority" class="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg dropdown-menu">
+                                            <div class="py-1">
+                                                <button @click="selectOption('priority', '')" class="w-full text-left px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600 transition">全部优先级</button>
+                                                <button @click="selectOption('priority', 'low')" class="w-full text-left px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600 transition">低</button>
+                                                <button @click="selectOption('priority', 'normal')" class="w-full text-left px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600 transition">普通</button>
+                                                <button @click="selectOption('priority', 'high')" class="w-full text-left px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600 transition">高</button>
+                                                <button @click="selectOption('priority', 'urgent')" class="w-full text-left px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600 transition">紧急</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- 读取状态筛选 -->
+                                    <div class="relative custom-dropdown">
+                                        <button @click="toggleDropdown('read')" 
+                                                class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm text-gray-900 dark:text-white text-left flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-600 transition">
+                                            <span>{{ getFilterDisplayText('read') }}</span>
+                                            <i :class="dropdownStates.read ? 'fas fa-chevron-up' : 'fas fa-chevron-down'" class="text-xs text-gray-500 dark:text-gray-400"></i>
+                                        </button>
+                                        <div v-if="dropdownStates.read" class="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg dropdown-menu">
+                                            <div class="py-1">
+                                                <button @click="selectOption('read', '')" class="w-full text-left px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600 transition">全部状态</button>
+                                                <button @click="selectOption('read', 'false')" class="w-full text-left px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600 transition">未读</button>
+                                                <button @click="selectOption('read', 'true')" class="w-full text-left px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600 transition">已读</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- 时间范围筛选 -->
+                                    <div class="relative custom-dropdown">
+                                        <button @click="toggleDropdown('days')" 
+                                                class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm text-gray-900 dark:text-white text-left flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-600 transition">
+                                            <span>{{ getFilterDisplayText('days') }}</span>
+                                            <i :class="dropdownStates.days ? 'fas fa-chevron-up' : 'fas fa-chevron-down'" class="text-xs text-gray-500 dark:text-gray-400"></i>
+                                        </button>
+                                        <div v-if="dropdownStates.days" class="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg dropdown-menu">
+                                            <div class="py-1">
+                                                <button @click="selectOption('days', '')" class="w-full text-left px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600 transition">全部时间</button>
+                                                <button @click="selectOption('days', '1')" class="w-full text-left px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600 transition">今天</button>
+                                                <button @click="selectOption('days', '7')" class="w-full text-left px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600 transition">最近7天</button>
+                                                <button @click="selectOption('days', '30')" class="w-full text-left px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600 transition">最近30天</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- 服务筛选 -->
+                                    <div class="relative custom-dropdown">
+                                        <button @click="toggleDropdown('service')" 
+                                                class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm text-gray-900 dark:text-white text-left flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-600 transition">
+                                            <span class="truncate">{{ getFilterDisplayText('service') }}</span>
+                                            <i :class="dropdownStates.service ? 'fas fa-chevron-up' : 'fas fa-chevron-down'" class="text-xs text-gray-500 dark:text-gray-400 ml-1"></i>
+                                        </button>
+                                        <div v-if="dropdownStates.service" class="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg dropdown-menu max-h-48 overflow-y-auto">
+                                            <div class="py-1">
+                                                <button @click="selectOption('service', '')" class="w-full text-left px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600 transition">全部服务</button>
+                                                <button v-for="service in servicesList" :key="service" @click="selectOption('service', service)" 
+                                                        class="w-full text-left px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600 transition truncate">
+                                                    {{ service }}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- 模式筛选 -->
+                                    <div class="relative custom-dropdown">
+                                        <button @click="toggleDropdown('mode')" 
+                                                class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm text-gray-900 dark:text-white text-left flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-600 transition">
+                                            <span>{{ getFilterDisplayText('mode') }}</span>
+                                            <i :class="dropdownStates.mode ? 'fas fa-chevron-up' : 'fas fa-chevron-down'" class="text-xs text-gray-500 dark:text-gray-400"></i>
+                                        </button>
+                                        <div v-if="dropdownStates.mode" class="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg dropdown-menu">
+                                            <div class="py-1">
+                                                <button @click="selectOption('mode', '')" class="w-full text-left px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600 transition">全部模式</button>
+                                                <button @click="selectOption('mode', 'active')" class="w-full text-left px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600 transition">主动模式</button>
+                                                <button @click="selectOption('mode', 'passive')" class="w-full text-left px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600 transition">被动模式</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    </div>
+                                </div>
+                                
+                            <!-- 操作按钮 -->
+                            <div class="flex flex-col sm:flex-row gap-2 sm:gap-4">
+                                <button @click="executeAction('markAllAsRead')" 
+                                        class="w-full sm:w-auto bg-blue-500 dark:bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-600 dark:hover:bg-blue-700 text-sm font-medium transition">
+                                    <i class="fas fa-check-double mr-2"></i>全部标记已读
+                                    </button>
+                                <button @click="refreshNotifications" 
+                                        class="w-full sm:w-auto bg-green-500 dark:bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-600 dark:hover:bg-green-700 text-sm font-medium transition">
+                                    <i class="fas fa-sync-alt mr-2"></i>刷新
+                                </button>
+                                <button @click="exportNotifications" 
+                                        class="w-full sm:w-auto bg-purple-500 dark:bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-600 dark:hover:bg-purple-700 text-sm font-medium transition">
+                                    <i class="fas fa-download mr-2"></i>导出
+                                    </button>
+                                </div>
+                            </div>
+                            
+                        <!-- 通知列表 -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div v-if="filteredNotifications.length === 0" class="col-span-full text-center py-8 md:py-12">
+                                <i class="fas fa-bell-slash text-4xl md:text-6xl text-gray-400 dark:text-gray-500 mb-4"></i>
+                                <p class="text-gray-600 dark:text-gray-400 text-lg">暂无通知</p>
+                            </div>
+                            
+                            <div v-for="notification in paginatedNotifications" :key="notification.id" 
+                                 :class="{'opacity-60': isNotificationRead(notification)}"
+                                 class="bg-white dark:bg-gray-800 border-l-4 border dark:border-gray-700 rounded-lg p-3 hover:shadow-lg transition-all duration-200 theme-transition cursor-pointer group"
+                                 :style="{'border-left-color': getTypeColor(notification.type)}"
+                                     @click="handleNotificationClick(notification)">
+                                
+                                <!-- 标题和标签 -->
+                                <div class="flex items-start justify-between mb-2">
+                                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white flex-1 pr-2 line-clamp-2 leading-tight">
+                                        {{ notification.title }}
+                                    </h3>
+                                    <div class="flex items-center space-x-1 flex-shrink-0">
+                                        <span :class="'w-2 h-2 rounded-full ' + getTypeColor(notification.type)" 
+                                              :style="{'background-color': getTypeColor(notification.type)}"
+                                              :title="getTypeText(notification.type)"></span>
+                                        <span :class="'w-1.5 h-1.5 rounded-full ' + (notification.priority === 'urgent' ? 'bg-red-500' : notification.priority === 'high' ? 'bg-orange-500' : 'bg-gray-400')"
+                                              :title="getPriorityText(notification.priority)"></span>
+                                            </div>
+                                            </div>
+                                
+                                <!-- 内容 -->
+                                <p class="text-xs text-gray-600 dark:text-gray-300 mb-3 leading-relaxed line-clamp-3">{{ notification.content }}</p>
+                                
+                                <!-- 底部信息和操作 -->
+                                <div class="flex items-center justify-between">
+                                    <div class="flex-1 text-xs text-gray-500 dark:text-gray-400">
+                                        <div class="flex items-center mb-1">
+                                            <i class="fas fa-clock mr-1"></i>
+                                            <span class="truncate">{{ formatTime(notification.timestamp || notification.receivedAt) }}</span>
+                                        </div>
+                                        <div class="flex items-center">
+                                            <i class="fas fa-tag mr-1"></i>
+                                            <span class="truncate">{{ formatSource(notification.source) }}</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- 操作按钮 -->
+                                    <div class="flex items-center space-x-1 transition-opacity" @click.stop>
+                                        <button v-if="!isNotificationRead(notification)" 
+                                                @click="markAsRead(notification.id)"
+                                                class="w-6 h-6 bg-blue-500 dark:bg-blue-600 text-white rounded hover:bg-blue-600 dark:hover:bg-blue-700 transition flex items-center justify-center"
+                                                title="标记已读">
+                                            <i class="fas fa-check text-xs"></i>
+                                            </button>
+                                        
+                                        <button v-if="notification.callback_url || notification.callbackUrl" 
+                                                @click="openCallback(notification.callback_url || notification.callbackUrl)"
+                                                class="w-6 h-6 bg-green-500 dark:bg-green-600 text-white rounded hover:bg-green-600 dark:hover:bg-green-700 transition flex items-center justify-center"
+                                                title="打开链接">
+                                            <i class="fas fa-external-link-alt text-xs"></i>
+                                            </button>
+                                        
+                                        <button @click="showNotificationDetail(notification)"
+                                                class="w-6 h-6 bg-purple-500 dark:bg-purple-600 text-white rounded hover:bg-purple-600 dark:hover:bg-purple-700 transition flex items-center justify-center"
+                                                title="查看详情">
+                                            <i class="fas fa-info-circle text-xs"></i>
+                                        </button>
+                                        
+                                        <button @click="executeAction('deleteNotification', notification.id)"
+                                                class="w-6 h-6 bg-red-500 dark:bg-red-600 text-white rounded hover:bg-red-600 dark:hover:bg-red-700 transition flex items-center justify-center"
+                                                title="删除通知">
+                                            <i class="fas fa-trash text-xs"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                        </div>
+
+                        <!-- 分页 -->
+                        <div v-if="totalPages > 1" class="mt-6 md:mt-8">
+                            <div class="flex flex-col sm:flex-row items-center justify-between">
+                                <div class="text-sm text-gray-600 dark:text-gray-400 mb-4 sm:mb-0">
+                                    显示第 {{ (currentPage - 1) * itemsPerPage + 1 }} - {{ Math.min(currentPage * itemsPerPage, filteredNotifications.length) }} 条，
+                                    共 {{ filteredNotifications.length }} 条通知
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <button @click="currentPage = 1" 
+                                            :disabled="currentPage === 1"
+                                            class="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+                                        首页
+                                    </button>
+                                    <button @click="currentPage--" 
+                                            :disabled="currentPage === 1"
+                                            class="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+                                        上一页
+                                    </button>
+                                    <span class="px-3 py-2 text-sm text-gray-600 dark:text-gray-400">
+                                        {{ currentPage }} / {{ totalPages }}
+                                    </span>
+                                    <button @click="currentPage++" 
+                                            :disabled="currentPage === totalPages"
+                                            class="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+                                        下一页
+                                    </button>
+                                    <button @click="currentPage = totalPages" 
+                                            :disabled="currentPage === totalPages"
+                                            class="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+                                        末页
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 订阅管理 -->
+                    <div v-if="currentTab === 'subscriptions'" class="p-4 md:p-6">
+                        <!-- 添加订阅按钮 -->
+                        <div class="mb-4 md:mb-6">
+                            <div class="flex space-x-3">
+                                    <button @click="showPassiveSubscription = true" 
+                                        class="bg-green-500 dark:bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-600 dark:hover:bg-green-700 text-sm font-medium transition">
+                                    <i class="fas fa-plus mr-2"></i>添加被动订阅
+                                    </button>
+                                    <button @click="generateNotifyCode" 
+                                        class="bg-blue-500 dark:bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-600 dark:hover:bg-blue-700 text-sm font-medium transition">
+                                        <i class="fas fa-key mr-2"></i>生成标识码
+                                    </button>
+                                </div>
+                            </div>
+
+                        <!-- 订阅列表 -->
+                        <div class="space-y-4">
+                            <div v-if="subscriptions.length === 0" class="text-center py-8 md:py-12">
+                                <i class="fas fa-link text-4xl md:text-6xl text-gray-400 dark:text-gray-500 mb-4"></i>
+                                <p class="text-gray-600 dark:text-gray-400 text-lg">暂无订阅</p>
+                            </div>
+
+                                <div v-for="subscription in subscriptions" :key="subscription.id" 
+                                 class="border dark:border-gray-700 rounded-lg p-4 md:p-6 bg-white dark:bg-gray-800 theme-transition">
+                                    <div class="flex justify-between items-start">
+                                        <div class="flex-1">
+                                            <div class="flex items-center space-x-2 mb-2">
+                                            <h4 class="font-medium text-gray-900 dark:text-white">{{ subscription.thirdPartyName }}</h4>
+                                            <span :class="subscription.mode === 'active' ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200' : 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'"
+                                                      class="px-2 py-1 text-xs rounded-full">
+                                                    {{ subscription.mode === 'active' ? '主动模式' : '被动模式' }}
+                                                </span>
+                                            <span :class="subscription.isActive ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' : 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'"
+                                                      class="px-2 py-1 text-xs rounded-full">
+                                                    {{ subscription.isActive ? '启用' : '禁用' }}
+                                                </span>
+                                            </div>
+                                        <p class="text-gray-600 dark:text-gray-300 text-sm mb-2">{{ subscription.thirdPartyUrl }}</p>
+                                        <div class="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
+                                                <span><i class="fas fa-clock mr-1"></i>{{ formatDate(subscription.subscribedAt) }}</span>
+                                                <span><i class="fas fa-bell mr-1"></i>{{ subscription.notificationCount }} 条通知</span>
+                                                <span v-if="subscription.mode === 'passive'">
+                                                    <i class="fas fa-sync mr-1"></i>{{ subscription.pollingInterval }} 分钟轮询
+                                                </span>
+                                                <span v-if="subscription.mode === 'active'">
+                                                    <i class="fas fa-paper-plane mr-1"></i>直接推送
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div class="flex space-x-2 ml-4">
+                                            <button @click="toggleSubscription(subscription)" 
+                                                :class="subscription.isActive ? 'text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300' : 'text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300'"
+                                                    class="transition">
+                                                <i :class="subscription.isActive ? 'fas fa-pause' : 'fas fa-play'"></i>
+                                            </button>
+                                            <button v-if="subscription.mode === 'passive' && subscription.isActive" 
+                                                    @click="triggerPassivePoll(subscription)"
+                                                    :disabled="isSubscriptionInCooldown(subscription.id)"
+                                                    :title="isSubscriptionInCooldown(subscription.id) ? 
+                                                            `冷却中，剩余 ${getSubscriptionCooldownRemaining(subscription.id)} 秒` : 
+                                                            '立即轮询'"
+                                                class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition disabled:text-gray-400 dark:disabled:text-gray-600 disabled:cursor-not-allowed">
+                                                <i v-if="isSubscriptionLoading(subscription.id)" class="fas fa-spinner fa-spin"></i>
+                                                <i v-else class="fas fa-sync-alt"></i>
+                                            </button>
+                                            <button @click="deleteSubscription(subscription.id)" 
+                                                class="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 transition">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    <!-- 账户设置 -->
+                    <div v-if="currentTab === 'settings'" class="p-4 md:p-6">
+                            <div>
+                            <h3 class="text-lg font-medium mb-4 text-gray-900 dark:text-white">账户设置</h3>
+                            <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg theme-transition">
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">用户名</label>
+                                        <p class="mt-1 text-sm text-gray-900 dark:text-white">{{ user.username }}</p>
+                                        </div>
+                                        <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">邮箱</label>
+                                        <p class="mt-1 text-sm text-gray-900 dark:text-white">{{ user.email }}</p>
+                                        </div>
+                                        <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">通知ID</label>
+                                        <p class="mt-1 text-sm text-gray-900 dark:text-white font-mono">{{ user.notifyId }}</p>
+                                        </div>
+                                        <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">注册时间</label>
+                                        <p class="mt-1 text-sm text-gray-900 dark:text-white">{{ formatDate(user.createdAt) }}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div v-if="notifyCode">
+                            <h3 class="text-lg font-medium mb-4 text-gray-900 dark:text-white">当前标识码</h3>
+                            <div class="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 p-4 rounded-lg theme-transition">
+                                    <div class="flex items-center justify-between">
+                                    <code class="text-sm font-mono bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 rounded border dark:border-gray-600">{{ notifyCode }}</code>
+                                        <button @click="copyToClipboard(notifyCode)" 
+                                            class="bg-blue-500 dark:bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-600 dark:hover:bg-blue-700 transition">
+                                            <i class="fas fa-copy mr-2"></i>复制
+                                        </button>
+                                    </div>
+                                <p class="text-sm text-blue-700 dark:text-blue-300 mt-2">
+                                        <i class="fas fa-clock mr-1"></i>此标识码5分钟后过期，请及时使用
+                                    </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 登录弹窗 -->
+        <transition name="modal">
+            <div v-if="showLogin" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" @click="showLogin = false">
+                <transition name="modal-content">
+                    <div v-if="showLogin" class="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4 theme-transition" @click.stop>
+                <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-medium text-gray-900 dark:text-white">用户登录</h3>
+                            <button @click="showLogin = false" class="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <form @submit.prevent="login">
+                    <div class="space-y-4">
+                        <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">邮箱</label>
+                            <input v-model="loginForm.email" type="email" required 
+                                           class="mt-1 block w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400 dark:focus:border-blue-400">
+                        </div>
+                        <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">密码</label>
+                            <input v-model="loginForm.password" type="password" required 
+                                           class="mt-1 block w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400 dark:focus:border-blue-400">
+                        </div>
+                        <button type="submit" :disabled="loading" 
+                                        class="w-full bg-blue-500 dark:bg-blue-600 text-white py-2 rounded-md hover:bg-blue-600 dark:hover:bg-blue-700 transition disabled:opacity-50">
+                            <span v-if="loading"><i class="fas fa-spinner fa-spin mr-2"></i>登录中...</span>
+                            <span v-else>登录</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+                </transition>
+        </div>
+        </transition>
+
+        <!-- 注册弹窗 -->
+        <transition name="modal">
+            <div v-if="showRegister" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" @click="showRegister = false">
+                <transition name="modal-content">
+                    <div v-if="showRegister" class="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4 theme-transition" @click.stop>
+                <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-medium text-gray-900 dark:text-white">用户注册</h3>
+                            <button @click="showRegister = false" class="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <form @submit.prevent="register">
+                    <div class="space-y-4">
+                        <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">用户名</label>
+                            <input v-model="registerForm.username" type="text" required 
+                                           class="mt-1 block w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400 dark:focus:border-blue-400">
+                        </div>
+                        <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">邮箱</label>
+                            <input v-model="registerForm.email" type="email" required 
+                                           class="mt-1 block w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400 dark:focus:border-blue-400">
+                        </div>
+                        <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">密码</label>
+                            <input v-model="registerForm.password" type="password" required 
+                                           class="mt-1 block w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400 dark:focus:border-blue-400">
+                        </div>
+                        <button type="submit" :disabled="loading" 
+                                        class="w-full bg-green-500 dark:bg-green-600 text-white py-2 rounded-md hover:bg-green-600 dark:hover:bg-green-700 transition disabled:opacity-50">
+                            <span v-if="loading"><i class="fas fa-spinner fa-spin mr-2"></i>注册中...</span>
+                            <span v-else>注册</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+                </transition>
+        </div>
+        </transition>
+
+        <!-- 被动订阅弹窗 -->
+        <transition name="modal">
+            <div v-if="showPassiveSubscription" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" @click="showPassiveSubscription = false">
+                <transition name="modal-content">
+                    <div v-if="showPassiveSubscription" class="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-lg mx-4 theme-transition" @click.stop>
+                <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-medium text-gray-900 dark:text-white">创建被动订阅</h3>
+                            <button @click="showPassiveSubscription = false" class="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                        <div class="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 p-4 rounded-lg mb-4 theme-transition">
+                            <h4 class="font-medium text-blue-900 dark:text-blue-200 mb-2">
+                        <i class="fas fa-info-circle mr-2"></i>使用说明
+                    </h4>
+                            <p class="text-sm text-blue-800 dark:text-blue-300">
+                        输入第三方服务的通知API地址，系统将自动获取服务信息并设置轮询。
+                    </p>
+                </div>
+                
+                <form @submit.prevent="createPassiveSubscription">
+                    <div class="space-y-4">
+                        <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                第三方服务API地址 <span class="text-red-500">*</span>
+                            </label>
+                            <input v-model="passiveForm.apiUrl" type="url" required 
+                                   placeholder="https://example.com/api/notifications"
+                                           class="mt-1 block w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400 dark:focus:border-blue-400">
+                                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                <i class="fas fa-lightbulb mr-1"></i>
+                                示例：http://localhost:5000/api/notifications
+                            </p>
+                        </div>
+                        
+                        <!-- 预览区域 -->
+                                <div v-if="servicePreview" class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg theme-transition">
+                                    <h5 class="font-medium text-gray-900 dark:text-white mb-2">服务信息预览</h5>
+                            <div class="space-y-1 text-sm">
+                                        <div><span class="font-medium text-gray-700 dark:text-gray-300">服务名称：</span><span class="text-gray-900 dark:text-white">{{ servicePreview.name }}</span></div>
+                                        <div><span class="font-medium text-gray-700 dark:text-gray-300">描述：</span><span class="text-gray-900 dark:text-white">{{ servicePreview.description }}</span></div>
+                                        <div><span class="font-medium text-gray-700 dark:text-gray-300">轮询间隔：</span><span class="text-gray-900 dark:text-white">{{ servicePreview.polling_interval }} 分钟</span></div>
+                                        <div v-if="servicePreview.version"><span class="font-medium text-gray-700 dark:text-gray-300">版本：</span><span class="text-gray-900 dark:text-white">{{ servicePreview.version }}</span></div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex space-x-3">
+                            <button type="button" @click="previewService" :disabled="!passiveForm.apiUrl || loading"
+                                            class="flex-1 bg-gray-500 dark:bg-gray-600 text-white py-2 rounded-md hover:bg-gray-600 dark:hover:bg-gray-700 transition disabled:opacity-50">
+                                <span v-if="loading">
+                                    <i class="fas fa-spinner fa-spin mr-2"></i>获取中...
+                                </span>
+                                <span v-else>
+                                    <i class="fas fa-search mr-2"></i>预览服务
+                                </span>
+                            </button>
+                            <button type="submit" :disabled="loading" 
+                                            class="flex-1 bg-green-500 dark:bg-green-600 text-white py-2 rounded-md hover:bg-green-600 dark:hover:bg-green-700 transition disabled:opacity-50">
+                                <span v-if="loading">
+                                    <i class="fas fa-spinner fa-spin mr-2"></i>创建中...
+                                </span>
+                                <span v-else>
+                                    <i class="fas fa-plus mr-2"></i>创建订阅
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+                </transition>
+        </div>
+        </transition>
+
+        <!-- 消息提示 -->
+        <div v-if="message" 
+             :class="message.type === 'success' ? 'bg-green-500' : 'bg-red-500'"
+             class="fixed top-4 right-4 text-white px-6 py-3 rounded-lg shadow-lg z-50 transition-all">
+            <div class="flex items-center">
+                <i :class="message.type === 'success' ? 'fas fa-check-circle' : 'fas fa-exclamation-circle'" class="mr-2"></i>
+                {{ message.text }}
+            </div>
+        </div>
+
+        <!-- 确认弹窗 -->
+        <transition name="modal">
+            <div v-if="showConfirm" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" @click="cancelConfirm">
+                <transition name="modal-content">
+                    <div v-if="showConfirm" class="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4 theme-transition" @click.stop>
+                        <div class="flex items-center mb-4">
+                            <div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center mr-4"
+                                 :class="confirmData.type === 'danger' ? 'bg-red-100 dark:bg-red-900/30' : 'bg-blue-100 dark:bg-blue-900/30'">
+                                <i :class="confirmData.type === 'danger' ? 'fas fa-exclamation-triangle text-red-600 dark:text-red-400' : 'fas fa-question-circle text-blue-600 dark:text-blue-400'" 
+                                   class="text-xl"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="text-lg font-medium text-gray-900 dark:text-white">{{ confirmData.title }}</h3>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-6">
+                            <p class="text-gray-600 dark:text-gray-300">{{ confirmData.message }}</p>
+                        </div>
+                        
+                        <div class="flex space-x-3 justify-end">
+                            <button @click="cancelConfirm" 
+                                    class="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition">
+                                取消
+                            </button>
+                            <button @click="confirmAction" 
+                                    :class="confirmData.type === 'danger' ? 
+                                            'bg-red-600 dark:bg-red-700 hover:bg-red-700 dark:hover:bg-red-800' : 
+                                            'bg-blue-600 dark:bg-blue-700 hover:bg-blue-700 dark:hover:bg-blue-800'"
+                                    class="px-4 py-2 text-white rounded-lg transition">
+                                {{ confirmData.confirmText || '确认' }}
+                            </button>
+                        </div>
+                    </div>
+                </transition>
+            </div>
+        </transition>
+
+        <!-- 通知详情弹窗 -->
+        <transition name="modal">
+            <div v-if="showNotificationModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" @click="showNotificationModal = false">
+                <transition name="modal-content">
+                    <div v-if="showNotificationModal" class="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto theme-transition" @click.stop>
+                <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-medium text-gray-900 dark:text-white">通知详情</h3>
+                            <button @click="showNotificationModal = false" class="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <div v-if="selectedNotification" class="space-y-6">
+                    <!-- 基本信息 -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">标题</label>
+                                    <p class="text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-700 p-3 rounded theme-transition">{{ selectedNotification.title }}</p>
+                        </div>
+                        <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">类型</label>
+                            <div class="flex items-center">
+                                <span :class="getTypeIcon(selectedNotification.type)" class="mr-2"></span>
+                                        <span class="capitalize text-gray-900 dark:text-white">{{ selectedNotification.type }}</span>
+                            </div>
+                        </div>
+                        <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">优先级</label>
+                            <span :class="getPriorityClass(selectedNotification.priority)" class="font-medium">
+                                {{ getPriorityText(selectedNotification.priority) }}
+                            </span>
+                        </div>
+                        <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">接收时间</label>
+                                    <p class="text-gray-900 dark:text-white">{{ formatDate(selectedNotification.receivedAt) }}</p>
+                        </div>
+                    </div>
+
+                    <!-- 内容 -->
+                    <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">内容</label>
+                                <div class="text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-700 p-3 rounded whitespace-pre-wrap theme-transition">{{ selectedNotification.content }}</div>
+                    </div>
+
+                    <!-- 回调链接 -->
+                    <div v-if="selectedNotification.callbackUrl">
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">回调链接</label>
+                        <div class="flex items-center space-x-2">
+                            <a :href="selectedNotification.callbackUrl" target="_blank" 
+                                       class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline break-all">
+                                {{ selectedNotification.callbackUrl }}
+                            </a>
+                            <button @click="copyToClipboard(selectedNotification.callbackUrl)" 
+                                            class="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 来源信息 -->
+                    <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">来源</label>
+                                <div class="bg-gray-50 dark:bg-gray-700 p-3 rounded theme-transition">
+                            <div class="flex items-center space-x-2 mb-2">
+                                        <i class="fas fa-tag text-gray-500 dark:text-gray-400"></i>
+                                        <span class="font-medium text-gray-900 dark:text-white">{{ selectedNotification.subscription.name }}</span>
+                                        <span class="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded">
+                                    {{ selectedNotification.subscription.mode === 'active' ? '主动模式' : '被动模式' }}
+                                </span>
+                            </div>
+                                    <div class="text-sm text-gray-600 dark:text-gray-300">
+                                <i class="fas fa-link mr-1"></i>
+                                <a :href="selectedNotification.subscription.url" target="_blank" 
+                                           class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline">
+                                    {{ selectedNotification.subscription.url }}
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 完整JSON数据 -->
+                    <div v-if="selectedNotification.rawData">
+                        <div class="flex justify-between items-center mb-2">
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">完整JSON数据</label>
+                            <button @click="copyJsonData(selectedNotification.rawData)" 
+                                            class="text-sm bg-gray-500 dark:bg-gray-600 text-white px-3 py-1 rounded hover:bg-gray-600 dark:hover:bg-gray-700 transition">
+                                <i class="fas fa-copy mr-1"></i>复制JSON
+                            </button>
+                        </div>
+                        <pre class="bg-gray-900 text-green-400 p-4 rounded overflow-x-auto text-sm max-h-64">{{ formatJsonData(selectedNotification.rawData) }}</pre>
+                    </div>
+
+                    <!-- 元数据 -->
+                    <div v-if="selectedNotification.metadata && Object.keys(selectedNotification.metadata).length > 0">
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">元数据</label>
+                                <pre class="bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white p-3 rounded overflow-x-auto text-sm max-h-32 theme-transition">{{ formatJsonData(selectedNotification.metadata) }}</pre>
+                    </div>
+                </div>
+            </div>
+                </transition>
+        </div>
+        </transition>
+    </div>
+
+    <script src="/js/app.js"></script>
+</body>
+</html> 

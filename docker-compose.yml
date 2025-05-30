@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  huisheen:
+    build: .
+    container_name: huisheen-app
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - MONGODB_URI=mongodb://mongo:27017/huisheen
+      - JWT_SECRET=${JWT_SECRET}
+      - WEBSITE_DOMAIN=${WEBSITE_DOMAIN:-localhost:3000}
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - huisheen-network
+    volumes:
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "node", "healthcheck.js"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  mongo:
+    image: mongo:4.4-focal
+    container_name: huisheen-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-password123}
+      MONGO_INITDB_DATABASE: huisheen
+    ports:
+      - "${MONGO_PORT:-27017}:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - ./mongo-init:/docker-entrypoint-initdb.d
+    networks:
+      - huisheen-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongo localhost:27017/huisheen --quiet
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+networks:
+  huisheen-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+    driver: local 
