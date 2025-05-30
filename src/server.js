@@ -77,7 +77,7 @@ const notificationLimiter = rateLimit({
     try {
       return (req.body && req.body.token) ? `token:${req.body.token.substring(0, 10)}` : `ip:${req.ip}`;
     } catch (error) {
-      console.warn('Rate limit keyGenerator error:', error);
+      console.warn('速率限制密钥加生器错误：', error);
       return `ip:${req.ip}`;
     }
   }

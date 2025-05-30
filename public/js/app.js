@@ -18,6 +18,10 @@ createApp({
             // 移动端菜单状态
             showMobileMenu: false,
             
+            // 语言相关状态
+            currentLanguage: localStorage.getItem('language') || 'zh',
+            showLanguageDropdown: false,
+            
             // 弹窗状态
             showLogin: false,
             showRegister: false,
@@ -29,7 +33,7 @@ createApp({
                 title: '',
                 message: '',
                 type: 'normal', // 'normal' 或 'danger'
-                confirmText: '确认',
+                confirmText: '',
                 onConfirm: null
             },
             
@@ -87,7 +91,8 @@ createApp({
                 days: false,
                 service: false,
                 mode: false,
-                mobileTab: false
+                mobileTab: false,
+                language: false
             },
             
             // 文档相关状态
@@ -100,6 +105,11 @@ createApp({
     },
     
     computed: {
+        // 获取当前语言的翻译对象
+        t() {
+            return i18n[this.currentLanguage] || i18n.zh;
+        },
+        
         // 判断是否在首页
         isHomePage() {
             return this.currentRoute === '/';
@@ -160,10 +170,10 @@ createApp({
                         const url = new URL(sub.thirdPartyUrl);
                         services.add(url.host);
                     } catch (e) {
-                        services.add(sub.thirdPartyName || '未知服务');
+                        services.add(sub.thirdPartyName || this.t.messages.unknownSource);
                     }
                 } else {
-                    services.add(sub.thirdPartyName || '未知服务');
+                    services.add(sub.thirdPartyName || this.t.messages.unknownSource);
                 }
             });
             return Array.from(services).sort();
@@ -172,8 +182,8 @@ createApp({
         // 模式列表
         modesList() {
             return [
-                { value: 'active', label: '主动模式' },
-                { value: 'passive', label: '被动模式' }
+                { value: 'active', label: this.t.user.notifications.filters.activeMode },
+                { value: 'passive', label: this.t.user.notifications.filters.passiveMode }
             ];
         },
         
@@ -215,10 +225,10 @@ createApp({
                             const url = new URL(n.subscription.thirdPartyUrl);
                             serviceHost = url.host;
                         } catch (e) {
-                            serviceHost = n.subscription.thirdPartyName || '未知服务';
+                            serviceHost = n.subscription.thirdPartyName || this.t.messages.unknownSource;
                         }
                     } else {
-                        serviceHost = n.subscription.thirdPartyName || '未知服务';
+                        serviceHost = n.subscription.thirdPartyName || this.t.messages.unknownSource;
                     }
                     return serviceHost === this.filters.service;
                 });
@@ -245,12 +255,39 @@ createApp({
             const start = (this.currentPage - 1) * this.itemsPerPage;
             const end = start + this.itemsPerPage;
             return this.filteredNotifications.slice(start, end);
+        },
+        
+        // 支持参数化的翻译文本获取
+        getText() {
+            return (key, params = {}) => {
+                const keys = key.split('.');
+                let text = this.t;
+                
+                for (const k of keys) {
+                    text = text[k];
+                    if (!text) return key;
+                }
+                
+                // 替换参数
+                if (typeof text === 'string' && Object.keys(params).length > 0) {
+                    return text.replace(/\{(\w+)\}/g, (match, paramKey) => {
+                        return params[paramKey] !== undefined ? params[paramKey] : match;
+                    });
+                }
+                
+                return text;
+            };
         }
     },
     
     mounted() {
         this.initAxios();
         this.initDarkMode();
+        
+        // 设置初始页面标题
+        document.title = this.currentLanguage === 'zh' 
+            ? '回声 (Huisheen) - 通知接收平台' 
+            : 'Huisheen (Echo) - Notification Platform';
         
         // 如果有token，先尝试加载用户数据，然后初始化路由
         if (this.token) {
@@ -423,7 +460,30 @@ createApp({
                 }
             }
             
-            this.showMessage(this.darkMode ? '已切换到夜间模式' : '已切换到日间模式');
+            this.showMessage(this.darkMode ? this.t.messages.darkModeOn : this.t.messages.lightModeOn);
+        },
+        
+        // 切换语言
+        toggleLanguage(lang) {
+            if (lang && lang !== this.currentLanguage) {
+                this.currentLanguage = lang;
+                localStorage.setItem('language', lang);
+                this.closeAllDropdowns();
+                
+                // 动态更新页面标题
+                document.title = this.currentLanguage === 'zh' 
+                    ? '回声 (Huisheen) - 通知接收平台' 
+                    : 'Huisheen (Echo) - Notification Platform';
+                
+                // 显示切换成功消息
+                const message = lang === 'zh' ? '已切换到中文' : 'Switched to English';
+                this.showMessage(message);
+                
+                // 如果在文档页面，重新加载文档
+                if (this.isDocsPage) {
+                    this.loadDocument();
+                }
+            }
         },
         
         // 显示确认弹窗
@@ -485,13 +545,13 @@ createApp({
                 
                 this.showLogin = false;
                 this.loginForm = { email: '', password: '' };
-                this.showMessage('登录成功！');
+                this.showMessage(this.t.messages.loginSuccess);
                 
                 // 登录成功后跳转到用户页面
                 this.navigateTo('/user');
                 this.loadUserData();
             } catch (error) {
-                this.showMessage(error.response?.data?.error || '登录失败', 'error');
+                this.showMessage(error.response?.data?.error || this.t.messages.loginFailed, 'error');
             } finally {
                 this.loading = false;
             }
@@ -510,13 +570,13 @@ createApp({
                 
                 this.showRegister = false;
                 this.registerForm = { username: '', email: '', password: '' };
-                this.showMessage('注册成功！');
+                this.showMessage(this.t.messages.registerSuccess);
                 
                 // 注册成功后跳转到用户页面
                 this.navigateTo('/user');
                 this.loadUserData();
             } catch (error) {
-                this.showMessage(error.response?.data?.error || '注册失败', 'error');
+                this.showMessage(error.response?.data?.error || this.t.messages.registerFailed, 'error');
             } finally {
                 this.loading = false;
             }
@@ -536,7 +596,7 @@ createApp({
             // 退出登录后跳转到首页（除非明确跳过导航）
             if (!skipNavigation) {
                 this.navigateTo('/');
-                this.showMessage('已退出登录');
+                this.showMessage(this.t.messages.logoutSuccess);
             }
         },
         
@@ -550,7 +610,7 @@ createApp({
                     this.loadStats()
                 ]);
             } catch (error) {
-                console.error('加载用户数据失败:', error);
+                console.error('Failed to load user data:', error);
                 if (error.response?.status === 401) {
                     this.logout();
                 }
@@ -580,7 +640,7 @@ createApp({
                 const response = await axios.get(url);
                 this.notifications = response.data.notifications;
             } catch (error) {
-                console.error('加载通知失败:', error);
+                console.error('Failed to load notifications:', error);
             }
         },
         
@@ -590,7 +650,7 @@ createApp({
                 const response = await axios.get('/subscriptions');
                 this.subscriptions = response.data.subscriptions;
             } catch (error) {
-                console.error('加载订阅失败:', error);
+                console.error('Failed to load subscriptions:', error);
             }
         },
         
@@ -600,7 +660,7 @@ createApp({
                 const response = await axios.get('/notifications/stats');
                 this.stats = response.data;
             } catch (error) {
-                console.error('加载统计失败:', error);
+                console.error('Failed to load stats:', error);
             }
         },
         
@@ -610,9 +670,9 @@ createApp({
                 const response = await axios.post('/auth/generate-notify-code');
                 this.notifyCode = response.data.notifyCode;
                 this.currentTab = 'settings';
-                this.showMessage('标识码生成成功！');
+                this.showMessage(this.t.messages.generateCodeSuccess);
             } catch (error) {
-                this.showMessage(error.response?.data?.error || '生成标识码失败', 'error');
+                this.showMessage(error.response?.data?.error || this.t.messages.generateCodeFailed, 'error');
             }
         },
         
@@ -627,10 +687,10 @@ createApp({
                     apiUrl: ''
                 };
                 this.servicePreview = null;
-                this.showMessage('被动订阅创建成功！');
+                this.showMessage(this.t.messages.subscriptionCreated);
                 this.loadSubscriptions();
             } catch (error) {
-                this.showMessage(error.response?.data?.error || '创建订阅失败', 'error');
+                this.showMessage(error.response?.data?.error || this.t.messages.subscriptionCreateFailed, 'error');
             } finally {
                 this.loading = false;
             }
@@ -651,10 +711,10 @@ createApp({
                 
                 const response = await axios.get(serviceInfoUrl);
                 this.servicePreview = response.data;
-                this.showMessage('服务信息获取成功！');
+                this.showMessage(this.t.messages.serviceInfoFetched);
             } catch (error) {
-                this.showMessage('无法获取服务信息，将使用默认配置', 'error');
-                console.error('获取服务信息失败:', error);
+                this.showMessage(this.t.messages.serviceInfoFetchFailed, 'error');
+                console.error('Failed to fetch service info:', error);
             } finally {
                 this.loading = false;
             }
@@ -667,9 +727,10 @@ createApp({
                     isActive: !subscription.isActive
                 });
                 subscription.isActive = !subscription.isActive;
-                this.showMessage(`订阅已${subscription.isActive ? '启用' : '禁用'}`);
+                const statusText = subscription.isActive ? this.t.user.subscriptions.status.enabled : this.t.user.subscriptions.status.disabled;
+                this.showMessage(`${this.t.messages.subscriptionToggled} - ${statusText}`);
             } catch (error) {
-                this.showMessage(error.response?.data?.error || '操作失败', 'error');
+                this.showMessage(error.response?.data?.error || this.t.messages.operationFailed, 'error');
             }
         },
         
@@ -688,10 +749,10 @@ createApp({
                 this.loading = true;
                 await axios.delete(`/subscriptions/${subscriptionId}`);
                 this.subscriptions = this.subscriptions.filter(s => s.id !== subscriptionId);
-                this.showMessage('订阅删除成功！');
+                this.showMessage(this.t.messages.subscriptionDeleted);
                 this.loadStats();
             } catch (error) {
-                this.showMessage(error.response?.data?.error || '删除订阅失败', 'error');
+                this.showMessage(error.response?.data?.error || this.t.messages.subscriptionDeleteFailed, 'error');
             } finally {
                 this.loading = false;
             }
@@ -705,7 +766,7 @@ createApp({
                 this.selectedNotification = response.data.notification;
                 this.showNotificationModal = true;
             } catch (error) {
-                this.showMessage(error.response?.data?.error || '获取通知详情失败', 'error');
+                this.showMessage(error.response?.data?.error || this.t.messages.notificationDetailFailed, 'error');
             } finally {
                 this.loading = false;
             }
@@ -733,7 +794,7 @@ createApp({
             try {
                 return JSON.stringify(data, null, 2);
             } catch (error) {
-                return '无法格式化数据';
+                return this.t.messages.formatDataFailed;
             }
         },
 
@@ -743,7 +804,7 @@ createApp({
                 const jsonString = this.formatJsonData(data);
                 await this.copyToClipboard(jsonString);
             } catch (error) {
-                this.showMessage('复制失败', 'error');
+                this.showMessage(this.t.messages.copyFailed, 'error');
             }
         },
 
@@ -758,17 +819,17 @@ createApp({
                 }
                 this.loadStats();
             } catch (error) {
-                this.showMessage(error.response?.data?.error || '操作失败', 'error');
+                this.showMessage(error.response?.data?.error || this.t.messages.operationFailed, 'error');
             }
         },
         
         // 删除通知（带确认）
         async deleteNotification(notificationId) {
             const confirmed = await this.showConfirmDialog({
-                title: '删除通知',
-                message: '确定要删除这条通知吗？删除后无法恢复。',
+                title: this.t.confirmDialog.deleteNotification.title,
+                message: this.t.confirmDialog.deleteNotification.message,
                 type: 'danger',
-                confirmText: '删除'
+                confirmText: this.t.confirmDialog.deleteNotification.confirm
             });
 
             if (!confirmed) return;
@@ -777,10 +838,10 @@ createApp({
                 this.loading = true;
                 await axios.delete(`/notifications/${notificationId}`);
                 this.notifications = this.notifications.filter(n => n.id !== notificationId);
-                this.showMessage('通知删除成功！');
+                this.showMessage(this.t.messages.notificationDeleted);
                 this.loadStats();
             } catch (error) {
-                this.showMessage(error.response?.data?.error || '删除通知失败', 'error');
+                this.showMessage(error.response?.data?.error || this.t.messages.notificationDeleteFailed, 'error');
             } finally {
                 this.loading = false;
             }
@@ -790,7 +851,7 @@ createApp({
         async copyToClipboard(text) {
             try {
                 await navigator.clipboard.writeText(text);
-                this.showMessage('复制成功！');
+                this.showMessage(this.t.messages.copySuccess);
             } catch (error) {
                 // 降级方案
                 const textArea = document.createElement('textarea');
@@ -799,8 +860,15 @@ createApp({
                 textArea.select();
                 document.execCommand('copy');
                 document.body.removeChild(textArea);
-                this.showMessage('复制成功！');
+                this.showMessage(this.t.messages.copySuccess);
             }
+        },
+        
+        // 格式化用户名显示
+        formatUsername(username) {
+            if (!username) return '';
+            // 如果用户名太长，截断并添加省略号
+            return username.length > 20 ? username.substring(0, 20) + '...' : username;
         },
         
         // 格式化日期
@@ -812,23 +880,23 @@ createApp({
             
             // 小于1分钟
             if (diff < 60000) {
-                return '刚刚';
+                return this.t.common.justNow;
             }
             // 小于1小时
             if (diff < 3600000) {
-                return Math.floor(diff / 60000) + '分钟前';
+                return Math.floor(diff / 60000) + this.t.common.minutesAgo;
             }
             // 小于1天
             if (diff < 86400000) {
-                return Math.floor(diff / 3600000) + '小时前';
+                return Math.floor(diff / 3600000) + this.t.common.hoursAgo;
             }
             // 小于7天
             if (diff < 604800000) {
-                return Math.floor(diff / 86400000) + '天前';
+                return Math.floor(diff / 86400000) + this.t.common.daysAgo;
             }
             
             // 超过7天显示具体日期
-            return date.toLocaleDateString('zh-CN', {
+            return date.toLocaleDateString(this.currentLanguage === 'zh' ? 'zh-CN' : 'en-US', {
                 year: 'numeric',
                 month: 'short',
                 day: 'numeric',
@@ -896,7 +964,7 @@ createApp({
                 
                 const response = await axios.post(`/subscriptions/${subscription.id}/trigger-poll`);
                 
-                this.showMessage(`轮询成功！获取到 ${response.data.result.newNotifications} 条新通知`);
+                this.showMessage(this.getText('messages.pollSuccess', { count: response.data.result.newNotifications }));
                 
                 // 重新加载通知和订阅列表
                 this.loadNotifications();
@@ -920,7 +988,7 @@ createApp({
                 
                 if (error.response?.status === 429) {
                     const remainingSeconds = error.response.data.remainingSeconds;
-                    this.showMessage(`请等待 ${remainingSeconds} 秒后再次触发`, 'error');
+                    this.showMessage(this.getText('messages.pollCooldown', { seconds: remainingSeconds }), 'error');
                     
                     // 设置剩余冷却时间
                     this.pollingTriggers.set(subscription.id, {
@@ -933,7 +1001,7 @@ createApp({
                         this.pollingTriggers.delete(subscription.id);
                     }, remainingSeconds * 1000);
                 } else {
-                    this.showMessage(error.response?.data?.error || '轮询触发失败', 'error');
+                    this.showMessage(error.response?.data?.error || this.t.messages.pollFailed, 'error');
                 }
             }
         },
@@ -967,7 +1035,7 @@ createApp({
                 const response = await axios.get('/notifications/categories/stats');
                 this.categories = response.data;
             } catch (error) {
-                console.error('加载分类信息失败:', error);
+                console.error('Failed to load categories:', error);
             }
         },
         
@@ -975,14 +1043,14 @@ createApp({
         async markAllAsRead() {
             const unreadCount = this.unreadNotifications;
             if (unreadCount === 0) {
-                this.showMessage('没有未读通知', 'error');
+                this.showMessage(this.t.confirmDialog.noUnreadNotifications, 'error');
                 return;
             }
 
             const confirmed = await this.showConfirmDialog({
-                title: '标记全部已读',
-                message: `确定要将所有 ${unreadCount} 条未读通知标记为已读吗？`,
-                confirmText: '标记已读'
+                title: this.t.confirmDialog.markAllAsRead.title,
+                message: this.t.confirmDialog.markAllAsRead.message,
+                confirmText: this.t.confirmDialog.markAllAsRead.confirm
             });
 
             if (!confirmed) return;
@@ -991,10 +1059,10 @@ createApp({
                 this.loading = true;
                 await axios.patch('/notifications/mark-all-read');
                 this.notifications.forEach(n => n.isRead = true);
-                this.showMessage(`已标记 ${unreadCount} 条通知为已读`);
+                this.showMessage(this.getText('confirmDialog.markedNotificationsAsRead', { count: unreadCount }));
                 this.loadStats();
             } catch (error) {
-                this.showMessage(error.response?.data?.error || '操作失败', 'error');
+                this.showMessage(error.response?.data?.error || this.t.messages.operationFailed, 'error');
             } finally {
                 this.loading = false;
             }
@@ -1045,7 +1113,7 @@ createApp({
         // 刷新通知
         async refreshNotifications() {
             await this.loadNotifications();
-            this.showMessage('通知已刷新');
+            this.showMessage(this.t.messages.notificationsRefreshed);
         },
         
         // 导出通知
@@ -1053,7 +1121,7 @@ createApp({
             try {
                 const notifications = this.filteredNotifications;
                 if (notifications.length === 0) {
-                    this.showMessage('没有通知可导出', 'error');
+                    this.showMessage(this.t.messages.noNotificationsToExport, 'error');
                     return;
                 }
                 
@@ -1067,9 +1135,9 @@ createApp({
                 link.click();
                 document.body.removeChild(link);
                 
-                this.showMessage(`已导出 ${notifications.length} 条通知`);
+                this.showMessage(this.getText('messages.notificationsExported', { count: notifications.length }));
             } catch (error) {
-                this.showMessage('导出失败', 'error');
+                this.showMessage(this.t.messages.exportFailed, 'error');
             }
         },
         
@@ -1130,14 +1198,14 @@ createApp({
         
         // 格式化时间
         formatTime(timestamp) {
-            if (!timestamp) return '未知时间';
+            if (!timestamp) return this.t.common.none || '未知时间';
             
             try {
                 const date = new Date(timestamp);
                 
                 // 检查日期是否有效
                 if (isNaN(date.getTime())) {
-                    return '时间格式错误';
+                    return this.currentLanguage === 'zh' ? '时间格式错误' : 'Invalid time format';
                 }
                 
                 const now = new Date();
@@ -1146,21 +1214,21 @@ createApp({
                 const hours = Math.floor(diff / 3600000);
                 const days = Math.floor(diff / 86400000);
                 
-                if (minutes < 1) return '刚刚';
-                if (minutes < 60) return `${minutes}分钟前`;
-                if (hours < 24) return `${hours}小时前`;
-                if (days < 7) return `${days}天前`;
+                if (minutes < 1) return this.t.common.justNow;
+                if (minutes < 60) return `${minutes}${this.t.common.minutesAgo}`;
+                if (hours < 24) return `${hours}${this.t.common.hoursAgo}`;
+                if (days < 7) return `${days}${this.t.common.daysAgo}`;
                 
-                return date.toLocaleString('zh-CN');
+                return date.toLocaleString(this.currentLanguage === 'zh' ? 'zh-CN' : 'en-US');
             } catch (error) {
-                console.error('时间格式化错误:', error, timestamp);
-                return '时间错误';
+                console.error('Time formatting error:', error, timestamp);
+                return this.currentLanguage === 'zh' ? '时间错误' : 'Time error';
             }
         },
         
         // 格式化来源显示
         formatSource(source) {
-            if (!source) return '未知来源';
+            if (!source) return this.t.messages.unknownSource;
             
             // 如果是字符串，直接返回
             if (typeof source === 'string') {
@@ -1169,7 +1237,7 @@ createApp({
             
             // 如果是对象，尝试获取名称
             if (typeof source === 'object') {
-                return source.name || source.title || source.serviceName || '第三方服务';
+                return source.name || source.title || source.serviceName || this.t.messages.thirdPartyService;
             }
             
             return String(source);
@@ -1224,38 +1292,40 @@ createApp({
         getFilterDisplayText(key) {
             const value = this.filters[key];
             
-            // 定义筛选类型标签
-            const filterLabels = {
-                type: '类型',
-                priority: '优先级', 
-                read: '状态',
-                days: '时间',
-                service: '服务',
-                mode: '模式'
+            // 获取筛选类型标签
+            const getFilterLabel = (filterKey) => {
+                const labelMap = {
+                    type: 'allTypes',
+                    priority: 'allPriorities', 
+                    read: 'allStatuses',
+                    days: 'allTimes',
+                    service: 'allServices',
+                    mode: 'allModes'
+                };
+                return this.t.user.notifications.filters[labelMap[filterKey]] || filterKey;
             };
             
-            const label = filterLabels[key] || key;
+            const label = getFilterLabel(key).split(' - ')[0] || key;
             
-            if (!value) return `${label} - 全部`;
+            if (!value) return `${label} - ${this.t.common.all}`;
             
             switch (key) {
                 case 'type':
-                    const typeTexts = { info: '信息', success: '成功', warning: '警告', error: '错误' };
-                    return `${label} - ${typeTexts[value] || value}`;
+                    const typeKey = `${value}`;
+                    return `${label} - ${this.t.common[typeKey] || value}`;
                 case 'priority':
-                    const priorityTexts = { low: '低', normal: '普通', high: '高', urgent: '紧急' };
-                    return `${label} - ${priorityTexts[value] || value}`;
+                    return `${label} - ${this.t.user.notifications.filters[value] || value}`;
                 case 'read':
-                    const readText = value === 'true' ? '已读' : '未读';
-                    return `${label} - ${readText}`;
+                    const readKey = value === 'true' ? 'read' : 'unread';
+                    return `${label} - ${this.t.user.notifications.filters[readKey]}`;
                 case 'days':
-                    const dayTexts = { '1': '今天', '7': '最近7天', '30': '最近30天' };
-                    return `${label} - ${dayTexts[value] || value}`;
+                    const dayMap = { '1': 'today', '7': 'last7Days', '30': 'last30Days' };
+                    return `${label} - ${this.t.user.notifications.filters[dayMap[value]] || value}`;
                 case 'service':
                     return `${label} - ${value}`;
                 case 'mode':
-                    const modeText = value === 'active' ? '主动模式' : '被动模式';
-                    return `${label} - ${modeText}`;
+                    const modeKey = value === 'active' ? 'activeMode' : 'passiveMode';
+                    return `${label} - ${this.t.user.notifications.filters[modeKey]}`;
                 default:
                     return `${label} - ${value}`;
             }
@@ -1268,12 +1338,14 @@ createApp({
         },
         
         getTabDisplayText() {
-            const tabTexts = {
-                notifications: '📢 通知管理',
-                subscriptions: '🔗 订阅管理', 
-                settings: '⚙️ 账户设置'
+            const tabIconMap = {
+                notifications: '📢',
+                subscriptions: '🔗', 
+                settings: '⚙️'
             };
-            return tabTexts[this.currentTab] || this.currentTab;
+            const icon = tabIconMap[this.currentTab] || '';
+            const text = this.t.user.tabs[this.currentTab] || this.currentTab;
+            return `${icon} ${text}`;
         },
         
         // 文档相关方法
@@ -1429,7 +1501,7 @@ createApp({
                     block: 'start'
                 });
             } else {
-                console.warn(`找不到ID为 "${sectionId}" 的元素`);
+                console.warn(`Element with ID "${sectionId}" not found`);
             }
         },
         
