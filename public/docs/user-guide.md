@@ -57,7 +57,7 @@
 
 ```bash
 # 第三方服务使用标识码推送通知的示例
-curl -X POST https://your-domain.com/api/notify \
+curl -X POST https://huisheen.xzt.plus/api/notify \
   -H "Content-Type: application/json" \
   -d '{
     "code": "YOUR_NOTIFY_CODE",

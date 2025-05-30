@@ -26,7 +26,7 @@
 
 ### 📱 基础信息
 
-- **基础URL**: `https://your-domain.com/api`
+- **基础URL**: `https://huisheen.xzt.plus/api`
 - **API版本**: v1
 - **内容类型**: `application/json`
 - **字符编码**: UTF-8
