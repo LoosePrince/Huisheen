@@ -14,7 +14,7 @@
 
 ### 快速部署
 
-[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/template/huisheen)
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/deploy?template=https://github.com/LoosePrince/Huisheen)
 
 ### 手动部署步骤
 
@@ -193,8 +193,8 @@ MONGO_ROOT_PASSWORD=请_更改_为_安全_的_密码
 2. **部署应用**
    ```bash
    # 克隆代码
-   git clone https://github.com/your-username/huisheen.git
-   cd huisheen
+   git clone https://github.com/LoosePrince/Huisheen.git
+   cd Huisheen
    
    # 安装依赖
    npm install --production
