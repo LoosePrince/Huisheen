@@ -10,11 +10,9 @@
 - [传统服务器部署](#传统服务器部署)
 - [云平台部署](#云平台部署)
 
-## Railway一键部署
+## Railway部署
 
-### 快速部署
-
-[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/deploy?template=https://github.com/LoosePrince/Huisheen)
+Railway是一个现代化的应用部署平台，支持自动部署、数据库集成和环境管理。
 
 ### 手动部署步骤
 
@@ -23,42 +21,150 @@
    - 使用GitHub账户登录
 
 2. **创建新项目**
-   ```bash
-   # 安装Railway CLI
-   npm install -g @railway/cli
+   - 在Railway仪表板中点击 "New Project"
+   - 选择 "Deploy from GitHub repo"
+   - 授权Railway访问您的GitHub账户
+   - 选择 `LoosePrince/Huisheen` 仓库（如果是fork的话选择您的fork）
+
+3. **添加MongoDB数据库**
+   - 在项目画布中点击 "New"
+   - 选择 "Database"
+   - 选择 "Add MongoDB"
+   - Railway会自动创建并连接MongoDB实例
+
+4. **配置环境变量**
+   - 点击您的应用服务
+   - 进入 "Variables" 标签
+   - 添加以下环境变量：
    
-   # 登录
-   railway login
-   
-   # 初始化项目
-   railway init
+   ```env
+   MONGODB_URI=${{MONGO_URL}}
+   JWT_SECRET=your_strong_jwt_secret_here_64_characters_long
+   WEBSITE_DOMAIN=your-app-name.railway.app
+   NODE_ENV=production
    ```
 
-3. **配置环境变量**
-   ```bash
-   # 设置MongoDB连接（Railway会自动提供）
-   railway variables set MONGODB_URI=${{MONGO_URL}}
-   
-   # 设置JWT密钥
-   railway variables set JWT_SECRET=$(openssl rand -hex 64)
-   
-   # 设置网站域名
-   railway variables set WEBSITE_DOMAIN=your-app.railway.app
-   ```
+5. **配置部署设置**
+   - 在 "Settings" 标签中确认：
+   - **Start Command**: `npm start`
+   - **Build Command**: `npm install --production`
+   - **Healthcheck Path**: `/health`
 
-4. **部署应用**
-   ```bash
-   railway up
-   ```
+6. **部署应用**
+   - Railway会自动检测到这是Node.js应用
+   - 推送代码或点击 "Deploy" 触发部署
+   - 等待部署完成（通常2-3分钟）
+
+### 使用Railway CLI部署
+
+如果您喜欢命令行工具：
+
+```bash
+# 安装Railway CLI
+npm install -g @railway/cli
+
+# 登录Railway
+railway login
+
+# 在项目目录中初始化
+git clone https://github.com/LoosePrince/Huisheen.git
+cd Huisheen
+
+# 创建新的Railway项目
+railway init
+
+# 添加MongoDB服务
+railway add --database mongodb
+
+# 设置环境变量
+railway variables set MONGODB_URI='${{MONGO_URL}}'
+railway variables set JWT_SECRET='your_jwt_secret_here'
+railway variables set WEBSITE_DOMAIN='your-app.railway.app'
+railway variables set NODE_ENV='production'
+
+# 部署应用
+railway up
+```
 
 ### Railway环境变量配置
 
 | 变量名 | 说明 | 示例值 |
 |--------|------|--------|
-| `MONGODB_URI` | MongoDB连接字符串 | `${{MONGO_URL}}` |
-| `JWT_SECRET` | JWT密钥 | 自动生成的64位hex字符串 |
+| `MONGODB_URI` | MongoDB连接字符串 | `${{MONGO_URL}}` (Railway自动提供) |
+| `JWT_SECRET` | JWT密钥 | 64位随机字符串 |
 | `WEBSITE_DOMAIN` | 应用域名 | `your-app.railway.app` |
 | `NODE_ENV` | 运行环境 | `production` |
+
+### 高级配置
+
+#### 自定义域名
+
+1. 在Railway中进入您的应用设置
+2. 点击 "Networking" 标签
+3. 添加自定义域名
+4. 更新 `WEBSITE_DOMAIN` 环境变量为您的自定义域名
+5. 重新部署应用
+
+#### 监控和日志
+
+- **实时日志**: 在Railway控制台的 "Deployments" 标签查看
+- **指标监控**: Railway提供CPU、内存、网络使用情况监控
+- **健康检查**: 自动使用 `/health` 端点进行健康检查
+
+#### 自动部署
+
+Railway默认启用自动部署：
+- 每次推送到主分支都会触发新的部署
+- 可以在 "Settings" → "Environment" 中配置部署分支
+- 支持Preview Deployments用于PR预览
+
+### 故障排除
+
+#### 常见问题
+
+1. **MongoDB连接失败**
+   ```bash
+   # 检查环境变量是否正确设置
+   railway variables
+   
+   # 确保MONGODB_URI指向正确的数据库
+   ```
+
+2. **应用启动失败**
+   ```bash
+   # 查看部署日志
+   railway logs
+   
+   # 检查package.json中的start脚本
+   ```
+
+3. **环境变量未生效**
+   - 修改环境变量后需要重新部署
+   - 确保变量名拼写正确（区分大小写）
+
+#### 调试命令
+
+```bash
+# 查看所有环境变量
+railway variables
+
+# 查看部署状态
+railway status
+
+# 查看实时日志
+railway logs --follow
+
+# 连接到应用shell
+railway shell
+```
+
+### 成本优化
+
+- Railway提供免费额度，适合开发和小型应用
+- 按使用量计费，应用睡眠时不产生费用
+- 可以设置使用限制防止意外超支
+
+更多Railway相关信息请查看 [Railway官方文档](https://docs.railway.app/)。
 
 ## Docker部署
 

@@ -147,21 +147,40 @@ npm start
 
 ## 🌐 部署
 
-### Railway 一键部署
+### Railway 部署
 
-[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/deploy?template=https://github.com/LoosePrince/Huisheen)
+Railway是一个现代化的云平台，可以轻松部署Node.js应用。
 
-点击上方按钮一键部署到Railway平台。
+#### 快速部署方式
 
-#### Railway部署步骤
+由于Railway的模板系统需要先在平台上注册，请按照以下步骤手动部署：
 
-1. 点击部署按钮
-2. 连接你的GitHub账户
-3. 配置环境变量：
-   - `MONGODB_URI`：MongoDB连接字符串
-   - `JWT_SECRET`：JWT密钥（自动生成）
-   - `WEBSITE_DOMAIN`：你的应用域名
-4. 等待部署完成
+1. **访问Railway并登录**
+   - 前往 [Railway](https://railway.app/)
+   - 使用GitHub账户登录
+
+2. **创建新项目**
+   - 点击 "New Project"
+   - 选择 "Deploy from GitHub repo"
+   - 选择您fork的 `Huisheen` 仓库
+
+3. **添加数据库**
+   - 在项目中点击 "New"
+   - 选择 "Database" → "Add MongoDB"
+
+4. **配置环境变量**
+   ```
+   MONGODB_URI=${{MONGO_URL}}  # Railway会自动提供
+   JWT_SECRET=your_strong_jwt_secret_here
+   WEBSITE_DOMAIN=your-app-name.railway.app
+   NODE_ENV=production
+   ```
+
+5. **部署完成**
+   - Railway会自动检测Node.js应用并部署
+   - 应用将在几分钟内可用
+
+#### 使用Railway CLI部署
 
 ### Docker 部署
 
