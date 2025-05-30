@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>第三方演示服务 - 回声(Huisheen)集成</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        [v-cloak] { display: none; }
+        .fade-enter-active, .fade-leave-active {
+            transition: opacity 0.3s ease;
+        }
+        .fade-enter-from, .fade-leave-to {
+            opacity: 0;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div id="app" v-cloak>
+        <!-- 导航栏 -->
+        <nav class="bg-white shadow-lg border-b border-gray-200">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-16">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0 flex items-center">
+                            <i class="fas fa-cog text-2xl text-green-600 mr-3"></i>
+                            <h1 class="text-xl font-bold text-gray-900">第三方演示服务</h1>
+                            <span class="ml-3 px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+                                回声集成
+                            </span>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <a :href="huisheenUrl" target="_blank" 
+                           class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition">
+                            <i class="fas fa-external-link-alt mr-2"></i>打开回声平台
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- 主内容 -->
+        <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+            <!-- 服务概览 -->
+            <div class="bg-white shadow rounded-lg p-6 mb-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-2xl font-bold text-gray-900">服务概览</h2>
+                    <div class="flex space-x-2">
+                        <a href="{{ url_for('external_api_page') }}" 
+                           class="bg-indigo-500 text-white px-3 py-2 rounded-md hover:bg-indigo-600 transition">
+                            <i class="fas fa-eye mr-1"></i>查看回声通知
+                        </a>
+                        <button @click="loadNotifications" 
+                                class="bg-gray-500 text-white px-3 py-2 rounded-md hover:bg-gray-600 transition">
+                            <i class="fas fa-sync mr-1"></i>刷新
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                        <div class="flex items-center">
+                            <i class="fas fa-bell text-blue-500 text-2xl mr-3"></i>
+                            <div>
+                                <p class="text-sm text-blue-700">总通知数</p>
+                                <p class="text-xl font-bold text-blue-900" v-text="notifications.length"></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-green-50 p-4 rounded-lg border border-green-200">
+                        <div class="flex items-center">
+                            <i class="fas fa-server text-green-500 text-2xl mr-3"></i>
+                            <div>
+                                <p class="text-sm text-green-700">服务状态</p>
+                                <p class="text-xl font-bold text-green-900">运行中</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                        <div class="flex items-center">
+                            <i class="fas fa-link text-purple-500 text-2xl mr-3"></i>
+                            <div>
+                                <p class="text-sm text-purple-700">回声连接</p>
+                                <p class="text-sm font-bold text-purple-900" v-text="huisheenUrl"></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                        <div class="flex items-center">
+                            <i class="fas fa-clock text-yellow-500 text-2xl mr-3"></i>
+                            <div>
+                                <p class="text-sm text-yellow-700">最后更新</p>
+                                <p class="text-sm font-bold text-yellow-900">{{ current_time }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h3 class="font-semibold text-gray-900 mb-2">
+                            <i class="fas fa-download text-blue-500 mr-2"></i>被动模式
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-2">
+                            回声平台定期轮询此服务获取新通知
+                        </p>
+                        <p class="text-xs text-gray-500">
+                            端点: <code class="bg-white px-1 rounded">GET <span v-text="demoUrl"></span>/api/notifications</code>
+                        </p>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h3 class="font-semibold text-gray-900 mb-2">
+                            <i class="fas fa-upload text-green-500 mr-2"></i>主动模式
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-2">
+                            此服务主动向回声平台推送通知
+                        </p>
+                        <p class="text-xs text-gray-500">
+                            端点: <code class="bg-white px-1 rounded">POST <span v-text="demoUrl"></span>/api/send-notification</code>
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 标签页 -->
+            <div class="bg-white shadow rounded-lg">
+                <div class="border-b border-gray-200">
+                    <nav class="-mb-px flex space-x-8">
+                        <button @click="activeTab = 'notifications'"
+                                :class="activeTab === 'notifications' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
+                                class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
+                            <i class="fas fa-list mr-2"></i>通知列表
+                        </button>
+                        <button @click="activeTab = 'active-mode'"
+                                :class="activeTab === 'active-mode' ? 'border-green-500 text-green-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
+                                class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
+                            <i class="fas fa-paper-plane mr-2"></i>主动推送
+                        </button>
+                        <button @click="activeTab = 'passive-mode'"
+                                :class="activeTab === 'passive-mode' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
+                                class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
+                            <i class="fas fa-sync mr-2"></i>被动轮询
+                        </button>
+                        <button @click="activeTab = 'management'"
+                                :class="activeTab === 'management' ? 'border-purple-500 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
+                                class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
+                            <i class="fas fa-cog mr-2"></i>管理
+                        </button>
+                    </nav>
+                </div>
+
+                <div class="p-6">
+                    <!-- 通知列表 -->
+                    <div v-if="activeTab === 'notifications'" class="space-y-4">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-lg font-medium">本地通知列表</h3>
+                            <button @click="loadNotifications" 
+                                    class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition">
+                                <i class="fas fa-refresh mr-2"></i>刷新
+                            </button>
+                        </div>
+                        
+                        <div v-if="notifications.length === 0" class="text-center py-8 text-gray-500">
+                            <i class="fas fa-inbox text-4xl mb-4"></i>
+                            <p>暂无通知</p>
+                        </div>
+                        
+                        <div v-for="notification in notifications" :key="notification.id" 
+                             class="border rounded-lg p-4 bg-white hover:bg-gray-50 transition">
+                            <div class="flex justify-between items-start">
+                                <div class="flex-1">
+                                    <div class="flex items-center space-x-2 mb-2">
+                                        <span :class="getTypeIcon(notification.type)" class="text-lg"></span>
+                                        <h4 class="font-medium" v-text="notification.title"></h4>
+                                        <span :class="getPriorityClass(notification.priority)" 
+                                              class="px-2 py-1 text-xs rounded-full"
+                                              v-text="getPriorityText(notification.priority)">
+                                        </span>
+                                    </div>
+                                    <p class="text-gray-600 mb-2" v-text="notification.content"></p>
+                                    <div class="flex items-center space-x-4 text-sm text-gray-500">
+                                        <span><i class="fas fa-clock mr-1"></i><span v-text="formatTime(notification.timestamp)"></span></span>
+                                        <span><i class="fas fa-user mr-1"></i><span v-text="notification.source"></span></span>
+                                        <span><i class="fas fa-tag mr-1"></i><span v-text="notification.type"></span></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 主动模式 -->
+                    <div v-if="activeTab === 'active-mode'" class="space-y-6">
+                        <div>
+                            <h3 class="text-lg font-medium mb-4">主动推送通知到回声平台</h3>
+                            <div class="bg-blue-50 border border-blue-200 p-4 rounded-lg mb-4">
+                                <h4 class="font-medium text-blue-900 mb-2">
+                                    <i class="fas fa-info-circle mr-2"></i>使用说明
+                                </h4>
+                                <ol class="text-sm text-blue-800 space-y-1 list-decimal list-inside">
+                                    <li>可以使用已保存的token，或输入新的通知标识码</li>
+                                    <li>编写通知内容并发送</li>
+                                    <li>通知将直接推送到用户的回声账户</li>
+                                </ol>
+                            </div>
+                        </div>
+
+                        <!-- Token管理区域 -->
+                        <div class="bg-white border rounded-lg p-4">
+                            <div class="flex justify-between items-center mb-4">
+                                <h4 class="font-medium">已保存的Token</h4>
+                                <div class="space-x-2">
+                                    <button @click="loadTokens" 
+                                            class="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 transition">
+                                        <i class="fas fa-refresh mr-1"></i>刷新
+                                    </button>
+                                    <button @click="clearAllTokens" 
+                                            class="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 transition"
+                                            :disabled="savedTokens.length === 0">
+                                        <i class="fas fa-trash mr-1"></i>清空
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div v-if="savedTokens.length === 0" class="text-center py-4 text-gray-500">
+                                <i class="fas fa-key text-2xl mb-2"></i>
+                                <p>暂无已保存的token</p>
+                            </div>
+                            
+                            <div v-else class="space-y-2">
+                                <div v-for="token in savedTokens" :key="token.notify_id" 
+                                     class="border rounded p-3 hover:bg-gray-50 transition">
+                                    <div class="flex justify-between items-center">
+                                        <div class="flex-1">
+                                            <div class="flex items-center space-x-3">
+                                                <input type="radio" :value="token.notify_id" v-model="selectedTokenId"
+                                                       :id="'token-' + token.notify_id"
+                                                       class="text-blue-500 focus:ring-blue-500">
+                                                <label :for="'token-' + token.notify_id" class="flex-1 cursor-pointer">
+                                                    <div class="font-medium text-sm" v-text="token.third_party_name"></div>
+                                                    <div class="text-xs text-gray-500">
+                                                        ID: <span v-text="token.notify_id"></span> | 
+                                                        创建: <span v-text="formatTime(token.created_at)"></span>
+                                                    </div>
+                                                    <div class="text-xs text-gray-400 font-mono" v-text="token.token_preview"></div>
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <button @click="deleteToken(token.notify_id)" 
+                                                class="text-red-500 hover:text-red-700 ml-2">
+                                            <i class="fas fa-trash text-sm"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <form @submit.prevent="sendActiveNotification" class="space-y-4">
+                            <!-- Token选择方式 -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">发送方式</label>
+                                <div class="space-y-2">
+                                    <label class="flex items-center">
+                                        <input type="radio" value="saved" v-model="sendMode" class="mr-2">
+                                        <span>使用已保存的Token (从上方选择)</span>
+                                    </label>
+                                    <label class="flex items-center">
+                                        <input type="radio" value="new" v-model="sendMode" class="mr-2">
+                                        <span>使用新的通知标识码</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- 新通知标识码输入 -->
+                            <div v-if="sendMode === 'new'">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">
+                                    回声通知标识码 <span class="text-red-500">*</span>
+                                </label>
+                                <input v-model="activeForm.notifyCode" type="text" :required="sendMode === 'new'"
+                                       placeholder="notify:user:xxxx-xxxx-xxxx:xxxxxx@huisheen.com"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <p class="text-sm text-gray-600 mt-1">
+                                    从回声平台获取的通知标识码，格式：notify:user:xxxx-xxxx-xxxx:xxxxxx@huisheen.com
+                                </p>
+                            </div>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                        通知标题 <span class="text-red-500">*</span>
+                                    </label>
+                                    <input v-model="activeForm.title" type="text" required
+                                           placeholder="输入通知标题"
+                                           class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">通知类型</label>
+                                    <select v-model="activeForm.type" 
+                                            class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500">
+                                        <option value="info">信息</option>
+                                        <option value="success">成功</option>
+                                        <option value="warning">警告</option>
+                                        <option value="error">错误</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">优先级</label>
+                                    <select v-model="activeForm.priority" 
+                                            class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500">
+                                        <option value="low">低</option>
+                                        <option value="normal">普通</option>
+                                        <option value="high">高</option>
+                                        <option value="urgent">紧急</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">来源</label>
+                                    <input v-model="activeForm.source" type="text"
+                                           placeholder="第三方演示服务"
+                                           class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500">
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">外部ID (可选)</label>
+                                <input v-model="activeForm.externalId" type="text"
+                                       placeholder="用于去重的唯一标识符"
+                                       class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500">
+                                <p class="text-xs text-gray-500 mt-1">
+                                    可选，用于防止重复通知。如果不填写，系统会自动生成。
+                                </p>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">
+                                    通知内容 <span class="text-red-500">*</span>
+                                </label>
+                                <textarea v-model="activeForm.content" required rows="4"
+                                          placeholder="输入详细的通知内容..."
+                                          class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"></textarea>
+                            </div>
+                            
+                            <button type="submit" :disabled="loading || (sendMode === 'saved' && !selectedTokenId)"
+                                    class="w-full bg-green-500 text-white py-3 rounded-md hover:bg-green-600 transition disabled:opacity-50">
+                                <span v-if="loading">
+                                    <i class="fas fa-spinner fa-spin mr-2"></i>发送中...
+                                </span>
+                                <span v-else>
+                                    <i class="fas fa-paper-plane mr-2"></i>发送通知到回声平台
+                                </span>
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- 被动模式 -->
+                    <div v-if="activeTab === 'passive-mode'" class="space-y-6">
+                        <div>
+                            <h3 class="text-lg font-medium mb-4">被动轮询模式测试</h3>
+                            <div class="bg-green-50 border border-green-200 p-4 rounded-lg mb-4">
+                                <h4 class="font-medium text-green-900 mb-2">
+                                    <i class="fas fa-info-circle mr-2"></i>使用说明
+                                </h4>
+                                <ol class="text-sm text-green-800 space-y-1 list-decimal list-inside">
+                                    <li>在回声平台创建被动订阅</li>
+                                    <li>第三方服务名称：第三方演示服务</li>
+                                    <li>API端点：<span v-text="demoUrl"></span>/api/notifications</li>
+                                    <li>回声平台将定期轮询此端点获取新通知</li>
+                                </ol>
+                            </div>
+                        </div>
+
+                        <div class="space-y-4">
+                            <h4 class="font-medium mb-2">API端点信息</h4>
+                            <div class="bg-gray-50 p-4 rounded-lg space-y-2">
+                                <div>
+                                    <span class="font-medium">URL:</span>
+                                    <code class="bg-white px-2 py-1 rounded ml-2"><span v-text="demoUrl"></span>/api/notifications</code>
+                                </div>
+                                <div>
+                                    <span class="font-medium">方法:</span>
+                                    <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm ml-2">GET</span>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <h4 class="font-medium mb-2">测试API调用</h4>
+                                <button @click="testPassiveAPI" :disabled="loading"
+                                        class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition disabled:opacity-50">
+                                    <span v-if="loading">
+                                        <i class="fas fa-spinner fa-spin mr-2"></i>测试中...
+                                    </span>
+                                    <span v-else>
+                                        <i class="fas fa-play mr-2"></i>测试被动API
+                                    </span>
+                                </button>
+                            </div>
+                            
+                            <div v-if="passiveTestResult" class="bg-gray-50 p-4 rounded-lg">
+                                <h5 class="font-medium mb-2">API响应结果:</h5>
+                                <pre class="text-sm bg-white p-3 rounded border overflow-auto" v-text="JSON.stringify(passiveTestResult, null, 2)"></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 管理功能 -->
+                    <div v-if="activeTab === 'management'" class="space-y-6">
+                        <h3 class="text-lg font-medium">管理功能</h3>
+                        
+                        <!-- 创建通知 -->
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <h4 class="font-medium mb-3">创建本地通知</h4>
+                            <form @submit.prevent="createLocalNotification" class="space-y-3">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <input v-model="managementForm.title" type="text" placeholder="通知标题" required
+                                           class="border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <select v-model="managementForm.type" 
+                                            class="border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500">
+                                        <option value="info">信息</option>
+                                        <option value="success">成功</option>
+                                        <option value="warning">警告</option>
+                                        <option value="error">错误</option>
+                                    </select>
+                                </div>
+                                <textarea v-model="managementForm.content" placeholder="通知内容" required rows="2"
+                                          class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"></textarea>
+                                <button type="submit" :disabled="loading"
+                                        class="bg-purple-500 text-white px-4 py-2 rounded-md hover:bg-purple-600 transition disabled:opacity-50">
+                                    <i class="fas fa-plus mr-2"></i>创建通知
+                                </button>
+                            </form>
+                        </div>
+                        
+                        <!-- 批量操作 -->
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <h4 class="font-medium mb-3">批量操作</h4>
+                            <div class="flex flex-wrap gap-3">
+                                <button @click="generateSampleNotifications" :disabled="loading"
+                                        class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition disabled:opacity-50">
+                                    <i class="fas fa-magic mr-2"></i>生成示例通知
+                                </button>
+                                <button @click="generateTestNotification" :disabled="loading"
+                                        class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition disabled:opacity-50">
+                                    <i class="fas fa-flask mr-2"></i>生成测试通知(复杂JSON)
+                                </button>
+                                <button @click="clearAllNotifications" :disabled="loading"
+                                        class="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition disabled:opacity-50">
+                                    <i class="fas fa-trash mr-2"></i>清空所有通知
+                                </button>
+                            </div>
+                            <p class="text-sm text-gray-600 mt-2">
+                                <i class="fas fa-lightbulb mr-1"></i>
+                                测试通知包含复杂的JSON数据结构，用于测试回声平台的完整通知显示功能
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 消息提示 -->
+        <transition name="fade">
+            <div v-if="message" 
+                 :class="message.type === 'success' ? 'bg-green-500' : 'bg-red-500'"
+                 class="fixed top-4 right-4 text-white px-6 py-3 rounded-lg shadow-lg z-50">
+                <div class="flex items-center">
+                    <i :class="message.type === 'success' ? 'fas fa-check-circle' : 'fas fa-exclamation-circle'" class="mr-2"></i>
+                    <span v-text="message.text"></span>
+                </div>
+            </div>
+        </transition>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+        
+        createApp({
+            data() {
+                return {
+                    huisheenUrl: '{{ huisheen_url }}',
+                    demoUrl: '{{ demo_url }}',
+                    activeTab: 'notifications',
+                    loading: false,
+                    message: null,
+                    notifications: {{ notifications | tojson | safe }},
+                    passiveTestResult: null,
+                    activeForm: {
+                        notifyCode: '',
+                        title: '',
+                        content: '',
+                        type: 'info',
+                        priority: 'normal',
+                        source: '第三方演示服务',
+                        externalId: ''
+                    },
+                    managementForm: {
+                        title: '',
+                        content: '',
+                        type: 'info'
+                    },
+                    sendMode: 'saved',
+                    selectedTokenId: null,
+                    savedTokens: []
+                };
+            },
+            methods: {
+                showMessage(text, type = 'success') {
+                    this.message = { text, type };
+                    setTimeout(() => {
+                        this.message = null;
+                    }, 3000);
+                },
+                
+                formatTime(timestamp) {
+                    if (!timestamp) return '';
+                    return new Date(timestamp).toLocaleString('zh-CN');
+                },
+                
+                getTypeIcon(type) {
+                    const icons = {
+                        info: 'fas fa-info-circle text-blue-500',
+                        success: 'fas fa-check-circle text-green-500',
+                        warning: 'fas fa-exclamation-triangle text-yellow-500',
+                        error: 'fas fa-times-circle text-red-500'
+                    };
+                    return icons[type] || icons.info;
+                },
+                
+                getPriorityClass(priority) {
+                    const classes = {
+                        low: 'bg-gray-100 text-gray-800',
+                        normal: 'bg-blue-100 text-blue-800',
+                        high: 'bg-orange-100 text-orange-800',
+                        urgent: 'bg-red-100 text-red-800'
+                    };
+                    return classes[priority] || classes.normal;
+                },
+                
+                getPriorityText(priority) {
+                    const texts = {
+                        low: '低',
+                        normal: '普通',
+                        high: '高',
+                        urgent: '紧急'
+                    };
+                    return texts[priority] || '普通';
+                },
+                
+                async loadNotifications() {
+                    try {
+                        this.loading = true;
+                        const response = await axios.get('/api/notifications');
+                        this.notifications = response.data.notifications || [];
+                        this.showMessage('通知列表已刷新');
+                    } catch (error) {
+                        this.showMessage('加载通知失败: ' + (error.response?.data?.error || error.message), 'error');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                
+                async sendActiveNotification() {
+                    try {
+                        this.loading = true;
+                        
+                        let requestData = {
+                            title: this.activeForm.title,
+                            content: this.activeForm.content,
+                            type: this.activeForm.type,
+                            priority: this.activeForm.priority,
+                            source: this.activeForm.source,
+                            external_id: this.activeForm.externalId
+                        };
+                        
+                        if (this.sendMode === 'saved') {
+                            if (!this.selectedTokenId) {
+                                this.showMessage('请选择一个已保存的token', 'error');
+                                return;
+                            }
+                            requestData.use_saved_token = true;
+                            requestData.notify_id = this.selectedTokenId;
+                        } else {
+                            if (!this.activeForm.notifyCode) {
+                                this.showMessage('请输入通知标识码', 'error');
+                                return;
+                            }
+                            requestData.notify_code = this.activeForm.notifyCode;
+                        }
+                        
+                        const response = await axios.post('/api/send-notification', requestData);
+                        
+                        this.showMessage('通知已成功发送到回声平台！');
+                        
+                        // 如果使用了新的notify_code，刷新token列表
+                        if (this.sendMode === 'new') {
+                            await this.loadTokens();
+                        }
+                        
+                        // 清空表单
+                        this.activeForm.title = '';
+                        this.activeForm.content = '';
+                        this.activeForm.type = 'info';
+                        this.activeForm.priority = 'normal';
+                        this.activeForm.externalId = '';
+                        if (this.sendMode === 'new') {
+                            this.activeForm.notifyCode = '';
+                        }
+                        
+                    } catch (error) {
+                        this.showMessage('发送通知失败: ' + (error.response?.data?.error || error.message), 'error');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                
+                async testPassiveAPI() {
+                    try {
+                        this.loading = true;
+                        const response = await axios.get('/api/notifications', {
+                            params: {
+                                limit: 5
+                            }
+                        });
+                        this.passiveTestResult = response.data;
+                        this.showMessage('被动API测试成功');
+                    } catch (error) {
+                        this.showMessage('被动API测试失败: ' + (error.response?.data?.error || error.message), 'error');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                
+                async createLocalNotification() {
+                    try {
+                        this.loading = true;
+                        const response = await axios.post('/admin/create-notification', {
+                            title: this.managementForm.title,
+                            content: this.managementForm.content,
+                            type: this.managementForm.type
+                        });
+                        
+                        this.notifications.unshift(response.data.notification);
+                        this.showMessage('本地通知创建成功');
+                        
+                        // 清空表单
+                        this.managementForm.title = '';
+                        this.managementForm.content = '';
+                        this.managementForm.type = 'info';
+                        
+                    } catch (error) {
+                        this.showMessage('创建通知失败: ' + (error.response?.data?.error || error.message), 'error');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                
+                async generateSampleNotifications() {
+                    try {
+                        this.loading = true;
+                        await axios.post('/admin/generate-sample');
+                        await this.loadNotifications();
+                        this.showMessage('示例通知生成成功');
+                    } catch (error) {
+                        this.showMessage('生成示例通知失败: ' + (error.response?.data?.error || error.message), 'error');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                
+                async generateTestNotification() {
+                    try {
+                        this.loading = true;
+                        await axios.post('/admin/generate-test-notification');
+                        await this.loadNotifications();
+                        this.showMessage('复杂测试通知生成成功！包含丰富的JSON数据结构');
+                    } catch (error) {
+                        this.showMessage('生成测试通知失败: ' + (error.response?.data?.error || error.message), 'error');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                
+                async clearAllNotifications() {
+                    if (!confirm('确定要清空所有通知吗？此操作不可撤销。')) {
+                        return;
+                    }
+                    
+                    try {
+                        this.loading = true;
+                        await axios.post('/admin/clear-notifications');
+                        this.notifications = [];
+                        this.showMessage('所有通知已清空');
+                    } catch (error) {
+                        this.showMessage('清空通知失败: ' + (error.response?.data?.error || error.message), 'error');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                
+                async loadTokens() {
+                    try {
+                        this.loading = true;
+                        const response = await axios.get('/api/tokens');
+                        this.savedTokens = response.data.tokens || [];
+                        this.showMessage('已保存的token已刷新');
+                    } catch (error) {
+                        this.showMessage('加载已保存的token失败: ' + (error.response?.data?.error || error.message), 'error');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                
+                async clearAllTokens() {
+                    if (!confirm('确定要清空所有已保存的token吗？此操作不可撤销。')) {
+                        return;
+                    }
+                    
+                    try {
+                        this.loading = true;
+                        await axios.post('/api/tokens/clear');
+                        this.savedTokens = [];
+                        this.showMessage('所有已保存的token已清空');
+                    } catch (error) {
+                        this.showMessage('清空已保存的token失败: ' + (error.response?.data?.error || error.message), 'error');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                
+                async deleteToken(notify_id) {
+                    if (!confirm('确定要删除此token吗？此操作不可撤销。')) {
+                        return;
+                    }
+                    
+                    try {
+                        this.loading = true;
+                        await axios.delete(`/api/tokens/${notify_id}`);
+                        this.showMessage('已保存的token已删除');
+                        await this.loadTokens();
+                    } catch (error) {
+                        this.showMessage('删除已保存的token失败: ' + (error.response?.data?.error || error.message), 'error');
+                    } finally {
+                        this.loading = false;
+                    }
+                }
+            },
+            
+            mounted() {
+                this.showMessage('第三方演示服务已就绪');
+                this.loadTokens();
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html> 

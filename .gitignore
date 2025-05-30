@@ -79,6 +79,3 @@ coverage/
 # 锁定文件（根据团队偏好保留或忽略）
 # package-lock.json
 # yarn.lock 
-
-# demo
-demo/

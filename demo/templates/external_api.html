@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>回声通知查看器 - Demo应用</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .section {
+            margin-bottom: 40px;
+        }
+
+        .section h2 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+
+        .auth-section {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 12px;
+            border-left: 5px solid #3498db;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus {
+            border-color: #3498db;
+            outline: none;
+        }
+
+        .btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        .btn:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+        }
+
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+
+        .btn-secondary {
+            background: #95a5a6;
+        }
+
+        .btn-secondary:hover {
+            background: #7f8c8d;
+        }
+
+        .tokens-section {
+            margin-top: 30px;
+        }
+
+        .token-card {
+            background: white;
+            border: 2px solid #ecf0f1;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            transition: all 0.3s;
+        }
+
+        .token-card:hover {
+            border-color: #3498db;
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.1);
+        }
+
+        .token-info {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .token-details h4 {
+            color: #2c3e50;
+            margin-bottom: 8px;
+        }
+
+        .token-details p {
+            color: #7f8c8d;
+            margin-bottom: 5px;
+        }
+
+        .notifications-section {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 25px;
+            margin-top: 20px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #3498db;
+        }
+
+        .stat-label {
+            color: #7f8c8d;
+            margin-top: 5px;
+        }
+
+        .notification-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-left: 5px solid #3498db;
+            transition: all 0.3s;
+        }
+
+        .notification-card:hover {
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .notification-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+
+        .notification-title {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+
+        .notification-meta {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 10px;
+        }
+
+        .meta-item {
+            background: #ecf0f1;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        .meta-item.type-warning { background: #fff3cd; color: #856404; }
+        .meta-item.type-error { background: #f8d7da; color: #721c24; }
+        .meta-item.type-success { background: #d4edda; color: #155724; }
+        .meta-item.type-info { background: #d1ecf1; color: #0c5460; }
+
+        .priority-urgent { color: #e74c3c; font-weight: bold; }
+        .priority-high { color: #e67e22; font-weight: bold; }
+        .priority-normal { color: #3498db; }
+        .priority-low { color: #95a5a6; }
+
+        .notification-content {
+            color: #2c3e50;
+            line-height: 1.5;
+            margin-bottom: 15px;
+        }
+
+        .notification-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 14px;
+        }
+
+        .filters {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #7f8c8d;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #7f8c8d;
+        }
+
+        .home-link {
+            display: inline-block;
+            background: #95a5a6;
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            transition: background 0.3s;
+        }
+
+        .home-link:hover {
+            background: #7f8c8d;
+        }
+
+        .instruction {
+            background: #e8f4fd;
+            border: 1px solid #bee5eb;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .instruction h4 {
+            color: #0c5460;
+            margin-bottom: 10px;
+        }
+
+        .instruction ol {
+            color: #0c5460;
+            padding-left: 20px;
+        }
+
+        .instruction ol li {
+            margin-bottom: 5px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+                border-radius: 12px;
+            }
+
+            .content {
+                padding: 20px;
+            }
+
+            .header {
+                padding: 20px;
+            }
+
+            .header h1 {
+                font-size: 2em;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .filters {
+                grid-template-columns: 1fr;
+            }
+
+            .notification-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .notification-actions {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔗 回声通知查看器</h1>
+            <p>在Demo应用中查看回声平台的通知</p>
+        </div>
+
+        <div class="content">
+            <a href="{{ url_for('index') }}" class="home-link">← 返回首页</a>
+
+            <!-- 使用说明 -->
+            <div class="instruction">
+                <h4>📖 使用说明</h4>
+                <ol>
+                    <li>在回声平台登录您的账户</li>
+                    <li>进入"我的订阅"页面，点击"生成标识码"</li>
+                    <li>复制生成的完整标识码（格式：notify:user:xxxx-xxxx-xxxx:xxxxxx@huisheen.com）</li>
+                    <li>在下方输入框中粘贴标识码并点击"连接回声"</li>
+                    <li>连接成功后即可查看您在回声平台收到的通知</li>
+                </ol>
+            </div>
+
+            <!-- 认证部分 -->
+            <div class="section">
+                <h2>🔐 连接回声平台</h2>
+                <div class="auth-section">
+                    <div class="form-group">
+                        <label for="notifyCode">通知标识码</label>
+                        <input type="text" id="notifyCode" placeholder="notify:user:xxxx-xxxx-xxxx:xxxxxx@huisheen.com">
+                    </div>
+                    <button class="btn" onclick="authenticateAPI()">连接回声</button>
+                    <button class="btn btn-secondary" onclick="clearTokens()">清空所有连接</button>
+                </div>
+            </div>
+
+            <!-- 已连接的账户 -->
+            <div class="section tokens-section">
+                <h2>📱 已连接账户</h2>
+                <div id="tokensList">
+                    {% if tokens %}
+                        {% for token in tokens %}
+                        <div class="token-card">
+                            <div class="token-info">
+                                <div class="token-details">
+                                    <h4>{{ token.username }}</h4>
+                                    <p>通知ID: {{ token.notify_id }}</p>
+                                    <p>连接时间: {{ token.created_at }}</p>
+                                    <p>有效期: {{ token.expires_in }}</p>
+                                </div>
+                                <div>
+                                    <button class="btn btn-small" onclick="loadNotifications('{{ token.notify_id }}')">查看通知</button>
+                                    <button class="btn btn-danger btn-small" onclick="deleteToken('{{ token.notify_id }}')">断开连接</button>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty-state">
+                            <p>暂无已连接的账户</p>
+                            <p>请先输入通知标识码连接回声平台</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- 通知显示区域 -->
+            <div id="notificationsSection" class="section notifications-section" style="display: none;">
+                <h2>📨 通知列表</h2>
+                
+                <!-- 统计信息 -->
+                <div id="statsContainer" class="stats-grid"></div>
+
+                <!-- 筛选器 -->
+                <div class="filters">
+                    <div class="form-group">
+                        <label>类型筛选</label>
+                        <select id="typeFilter">
+                            <option value="">全部</option>
+                            <option value="info">信息</option>
+                            <option value="warning">警告</option>
+                            <option value="error">错误</option>
+                            <option value="success">成功</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>优先级筛选</label>
+                        <select id="priorityFilter">
+                            <option value="">全部</option>
+                            <option value="urgent">紧急</option>
+                            <option value="high">高</option>
+                            <option value="normal">普通</option>
+                            <option value="low">低</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>数量限制</label>
+                        <select id="limitFilter">
+                            <option value="10">10条</option>
+                            <option value="20" selected>20条</option>
+                            <option value="50">50条</option>
+                            <option value="100">100条</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>&nbsp;</label>
+                        <button class="btn" onclick="applyFilters()">应用筛选</button>
+                    </div>
+                </div>
+
+                <!-- 通知列表 -->
+                <div id="notificationsList"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 消息显示区域 -->
+    <div id="alertContainer"></div>
+
+    <script>
+        let currentNotifyId = null;
+
+        // 显示消息
+        function showAlert(message, type = 'info') {
+            const alertContainer = document.getElementById('alertContainer');
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.innerHTML = `
+                ${message}
+                <button style="float: right; background: none; border: none; font-size: 18px; cursor: pointer;" onclick="this.parentElement.remove()">×</button>
+            `;
+            alertContainer.appendChild(alert);
+            
+            // 5秒后自动消失
+            setTimeout(() => {
+                if (alert.parentElement) {
+                    alert.remove();
+                }
+            }, 5000);
+        }
+
+        // 认证API
+        async function authenticateAPI() {
+            const notifyCode = document.getElementById('notifyCode').value.trim();
+            
+            if (!notifyCode) {
+                showAlert('请输入通知标识码', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/external/auth', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        notify_code: notifyCode
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showAlert(`认证成功！已连接用户: ${data.userInfo.username}`, 'success');
+                    document.getElementById('notifyCode').value = '';
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1000);
+                } else {
+                    showAlert(data.error || '认证失败', 'error');
+                }
+            } catch (error) {
+                showAlert('认证请求失败: ' + error.message, 'error');
+            }
+        }
+
+        // 加载通知
+        async function loadNotifications(notifyId) {
+            currentNotifyId = notifyId;
+            const notificationsSection = document.getElementById('notificationsSection');
+            const notificationsList = document.getElementById('notificationsList');
+            const statsContainer = document.getElementById('statsContainer');
+
+            notificationsSection.style.display = 'block';
+            notificationsList.innerHTML = '<div class="loading">正在加载通知...</div>';
+            statsContainer.innerHTML = '';
+
+            try {
+                // 获取筛选参数
+                const params = new URLSearchParams();
+                const typeFilter = document.getElementById('typeFilter').value;
+                const priorityFilter = document.getElementById('priorityFilter').value;
+                const limitFilter = document.getElementById('limitFilter').value;
+
+                if (typeFilter) params.append('type', typeFilter);
+                if (priorityFilter) params.append('priority', priorityFilter);
+                if (limitFilter) params.append('limit', limitFilter);
+
+                const response = await fetch(`/api/external/notifications/${notifyId}?${params.toString()}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    displayStats(data.stats);
+                    displayNotifications(data.notifications, data.pagination);
+                } else {
+                    notificationsList.innerHTML = `<div class="empty-state">加载失败: ${data.error}</div>`;
+                }
+            } catch (error) {
+                notificationsList.innerHTML = `<div class="empty-state">请求失败: ${error.message}</div>`;
+            }
+        }
+
+        // 显示统计信息
+        function displayStats(stats) {
+            const statsContainer = document.getElementById('statsContainer');
+            
+            if (!stats) return;
+
+            statsContainer.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-number">${stats.total}</div>
+                    <div class="stat-label">总通知</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${stats.unread}</div>
+                    <div class="stat-label">未读</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${stats.read}</div>
+                    <div class="stat-label">已读</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${stats.today}</div>
+                    <div class="stat-label">今日</div>
+                </div>
+            `;
+        }
+
+        // 显示通知列表
+        function displayNotifications(notifications, pagination) {
+            const notificationsList = document.getElementById('notificationsList');
+
+            if (notifications.length === 0) {
+                notificationsList.innerHTML = '<div class="empty-state">🎉 没有未读通知！</div>';
+                return;
+            }
+
+            const notificationsHTML = notifications.map(notif => `
+                <div class="notification-card">
+                    <div class="notification-header">
+                        <div>
+                            <div class="notification-title">${notif.title}</div>
+                            <div class="notification-meta">
+                                <span class="meta-item type-${notif.type}">${getTypeText(notif.type)}</span>
+                                <span class="meta-item priority-${notif.priority}">${getPriorityText(notif.priority)}</span>
+                                <span class="meta-item">${notif.subscription.name}</span>
+                                <span class="meta-item">${formatDate(notif.receivedAt)}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="notification-content">${notif.content}</div>
+                    <div class="notification-actions">
+                        <button class="btn btn-small" onclick="markAsRead('${notif.id}')">标记已读</button>
+                        ${notif.callbackUrl ? `<button class="btn btn-secondary btn-small" onclick="window.open('${notif.callbackUrl}', '_blank')">查看详情</button>` : ''}
+                    </div>
+                </div>
+            `).join('');
+
+            notificationsList.innerHTML = `
+                ${notificationsHTML}
+                <div style="text-align: center; margin-top: 20px; color: #7f8c8d;">
+                    显示 ${notifications.length} 条，共 ${pagination.totalUnread} 条未读通知
+                </div>
+            `;
+        }
+
+        // 标记为已读
+        async function markAsRead(notificationId) {
+            if (!currentNotifyId) return;
+
+            try {
+                const response = await fetch(`/api/external/notifications/${currentNotifyId}/${notificationId}/read`, {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showAlert('通知已标记为已读', 'success');
+                    // 重新加载通知列表
+                    setTimeout(() => {
+                        loadNotifications(currentNotifyId);
+                    }, 1000);
+                } else {
+                    showAlert(data.error || '操作失败', 'error');
+                }
+            } catch (error) {
+                showAlert('请求失败: ' + error.message, 'error');
+            }
+        }
+
+        // 应用筛选
+        function applyFilters() {
+            if (currentNotifyId) {
+                loadNotifications(currentNotifyId);
+            }
+        }
+
+        // 删除token
+        async function deleteToken(notifyId) {
+            if (!confirm('确定要断开与此账户的连接吗？')) return;
+
+            try {
+                const response = await fetch(`/api/external/tokens/${notifyId}`, {
+                    method: 'DELETE'
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showAlert('连接已断开', 'success');
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1000);
+                } else {
+                    showAlert(data.error || '操作失败', 'error');
+                }
+            } catch (error) {
+                showAlert('请求失败: ' + error.message, 'error');
+            }
+        }
+
+        // 清空所有token
+        async function clearTokens() {
+            if (!confirm('确定要清空所有连接吗？')) return;
+
+            try {
+                const response = await fetch('/api/external/tokens/clear', {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showAlert('所有连接已清空', 'success');
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1000);
+                } else {
+                    showAlert(data.error || '操作失败', 'error');
+                }
+            } catch (error) {
+                showAlert('请求失败: ' + error.message, 'error');
+            }
+        }
+
+        // 辅助函数
+        function getTypeText(type) {
+            const types = {
+                'info': '信息',
+                'warning': '警告', 
+                'error': '错误',
+                'success': '成功'
+            };
+            return types[type] || type;
+        }
+
+        function getPriorityText(priority) {
+            const priorities = {
+                'urgent': '紧急',
+                'high': '高',
+                'normal': '普通',
+                'low': '低'
+            };
+            return priorities[priority] || priority;
+        }
+
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        // 页面加载时的初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 为筛选器添加变化监听
+            document.getElementById('typeFilter').addEventListener('change', applyFilters);
+            document.getElementById('priorityFilter').addEventListener('change', applyFilters);
+            
+            // 回车键提交
+            document.getElementById('notifyCode').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    authenticateAPI();
+                }
+            });
+        });
+    </script>
+</body>
+</html> 
