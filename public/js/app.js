@@ -162,18 +162,25 @@ createApp({
         // 服务列表（去重）
         servicesList() {
             const services = new Set();
-            this.subscriptions.forEach(sub => {
-                if (sub.serviceHost) {
-                    services.add(sub.serviceHost);
-                } else if (sub.thirdPartyUrl) {
-                    try {
-                        const url = new URL(sub.thirdPartyUrl);
-                        services.add(url.host);
-                    } catch (e) {
-                        services.add(sub.thirdPartyName || this.t.messages.unknownSource);
+            // 从通知数据中获取服务列表，而不是订阅数据
+            this.notifications.forEach(notification => {
+                if (notification.subscription) {
+                    let serviceName = '';
+                    if (notification.subscription.name) {
+                        serviceName = notification.subscription.name;
+                    } else if (notification.subscription.url) {
+                        try {
+                            const url = new URL(notification.subscription.url);
+                            serviceName = url.host;
+                        } catch (e) {
+                            serviceName = notification.subscription.url;
+                        }
+                    } else {
+                        serviceName = this.t.messages.unknownSource;
                     }
-                } else {
-                    services.add(sub.thirdPartyName || this.t.messages.unknownSource);
+                    services.add(serviceName);
+                } else if (notification.source && notification.source.name) {
+                    services.add(notification.source.name);
                 }
             });
             return Array.from(services).sort();
@@ -216,21 +223,28 @@ createApp({
             }
             if (this.filters.service) {
                 result = result.filter(n => {
-                    if (!n.subscription) return false;
-                    let serviceHost = '';
-                    if (n.subscription.serviceHost) {
-                        serviceHost = n.subscription.serviceHost;
-                    } else if (n.subscription.thirdPartyUrl) {
-                        try {
-                            const url = new URL(n.subscription.thirdPartyUrl);
-                            serviceHost = url.host;
-                        } catch (e) {
-                            serviceHost = n.subscription.thirdPartyName || this.t.messages.unknownSource;
+                    let serviceName = '';
+                    
+                    if (n.subscription) {
+                        if (n.subscription.name) {
+                            serviceName = n.subscription.name;
+                        } else if (n.subscription.url) {
+                            try {
+                                const url = new URL(n.subscription.url);
+                                serviceName = url.host;
+                            } catch (e) {
+                                serviceName = n.subscription.url;
+                            }
+                        } else {
+                            serviceName = this.t.messages.unknownSource;
                         }
+                    } else if (n.source && n.source.name) {
+                        serviceName = n.source.name;
                     } else {
-                        serviceHost = n.subscription.thirdPartyName || this.t.messages.unknownSource;
+                        serviceName = this.t.messages.unknownSource;
                     }
-                    return serviceHost === this.filters.service;
+                    
+                    return serviceName === this.filters.service;
                 });
             }
             if (this.filters.mode) {
@@ -1057,7 +1071,7 @@ createApp({
 
             try {
                 this.loading = true;
-                await axios.patch('/notifications/mark-all-read');
+                await axios.patch('/notifications/all/read');
                 this.notifications.forEach(n => n.isRead = true);
                 this.showMessage(this.getText('confirmDialog.markedNotificationsAsRead', { count: unreadCount }));
                 this.loadStats();

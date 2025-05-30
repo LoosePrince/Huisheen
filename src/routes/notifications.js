@@ -320,7 +320,7 @@ router.get('/', auth, [
 
     // 获取通知列表
     const notifications = await Notification.find(query)
-      .populate('subscriptionId', 'thirdPartyName thirdPartyUrl')
+      .populate('subscriptionId', 'thirdPartyName thirdPartyUrl mode')
       .sort({ receivedAt: -1 })
       .skip(skip)
       .limit(limit);
