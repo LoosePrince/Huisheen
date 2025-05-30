@@ -13,7 +13,7 @@
 [![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
 [![GitHub](https://img.shields.io/badge/GitHub-LoosePrince/Huisheen-black?style=flat-square&logo=github)](https://github.com/LoosePrince/Huisheen)
 
-**专注于通知接收的现代化服务平台**
+**通知接收与管理服务平台**
 
 [官网](https://your-demo-url.com) • [文档](docs/) • [API参考](#api-文档) • [部署指南](#部署)
 
@@ -33,14 +33,14 @@
 
 ## 🎯 项目简介
 
-回声（Huisheen）是一个通知接收服务平台。它提供了灵活的通知接收方式，支持第三方应用通过多种模式推送和获取通知，同时提供了完整的用户管理和安全验证机制。
+回声（Huisheen）是一个通知接收与管理服务平台。它提供了灵活的通知接收方式，支持第三方应用通过多种模式推送和获取通知，同时提供了用户管理和安全验证机制。
 
-### 核心理念
+### 设计理念
 
 - **简单易用**：提供直观的用户界面和简洁的API接口
-- **安全可靠**：完善的身份验证和权限管理机制
+- **安全可靠**：身份验证和权限管理机制
 - **灵活集成**：支持多种集成模式，适应不同应用场景
-- **现代架构**：基于现代Web技术，易于扩展和维护
+- **可扩展架构**：基于Web技术，易于扩展和维护
 
 ## ✨ 核心特性
 
@@ -52,9 +52,9 @@
 
 ### 🛡️ 安全与认证
 
-- **JWT身份验证**：安全的用户认证机制
-- **通知标识码**：唯一的用户标识和验证码系统
-- **域名验证**：智能的域名匹配和环境识别
+- **JWT身份验证**：用户认证机制
+- **通知标识码**：用户标识和验证码系统
+- **域名验证**：域名匹配和环境识别
 - **API限流**：防止恶意请求和滥用
 
 ### 📊 通知管理
@@ -62,12 +62,12 @@
 - **实时通知**：即时接收和显示通知
 - **分类筛选**：按类型、优先级、来源等维度筛选
 - **批量操作**：支持批量标记已读、删除等操作
-- **统计分析**：详细的通知统计和分析功能
+- **统计分析**：通知统计和分析功能
 
 ### 🔌 外部API
 
 - **RESTful API**：标准的REST API接口
-- **第三方集成**：简化的第三方应用集成流程
+- **第三方集成**：第三方应用集成流程
 - **回调支持**：支持通知回调链接
 - **数据导出**：支持通知数据的导出和同步
 
@@ -149,7 +149,7 @@ npm start
 
 ### Railway 部署
 
-Railway是一个现代化的云平台，可以轻松部署Node.js应用。
+Railway是一个云平台，可以部署Node.js应用。
 
 #### 快速部署方式
 
@@ -390,7 +390,7 @@ MONGODB_URI=${{MONGO_URL}}
 
 ### 生产环境安全配置
 
-1. **使用强JWT密钥**
+1. **使用安全的JWT密钥**
    ```bash
    # 生成安全的JWT密钥
    node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
@@ -403,12 +403,12 @@ MONGODB_URI=${{MONGO_URL}}
 
 3. **启用MongoDB认证**
    ```env
-   MONGODB_URI=mongodb://admin:strong_password@your-mongo-server:27017/huisheen?authSource=admin
+   MONGODB_URI=mongodb://admin:secure_password@your-mongo-server:27017/huisheen?authSource=admin
    ```
 
 ## 🤝 贡献指南
 
-我们欢迎所有形式的贡献！请遵循以下步骤：
+我们欢迎各种形式的贡献！请遵循以下步骤：
 
 ### 开发环境设置
 
@@ -461,7 +461,7 @@ npm run test:coverage
 
 ## 🐛 问题反馈
 
-如果你发现了bug或有功能建议，请：
+如果您发现了问题或有功能建议，请：
 
 1. 查看 [已知问题](https://github.com/LoosePrince/Huisheen/issues)
 2. 创建新的 [Issue](https://github.com/LoosePrince/Huisheen/issues/new)
@@ -478,7 +478,7 @@ npm run test:coverage
 
 ## 🙏 致谢
 
-感谢所有为这个项目做出贡献的开发者！
+感谢所有为这个项目贡献力量的开发者！
 
 特别感谢以下开源项目：
 - [Express.js](https://expressjs.com/)
