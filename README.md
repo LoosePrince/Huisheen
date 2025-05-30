@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![回声Logo](https://img.shields.io/badge/回声-Huisheen-blue?style=for-the-badge)
+<img src="public/logo.svg" alt="回声 Logo" width="120" height="120">
 
 [![GitHub stars](https://img.shields.io/github/stars/LoosePrince/Huisheen?style=social)](https://github.com/LoosePrince/Huisheen/stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/LoosePrince/Huisheen?style=social)](https://github.com/LoosePrince/Huisheen/network/members)
@@ -15,7 +15,7 @@
 
 **通知接收与管理服务平台**
 
-[官网](https://huisheen.xzt.plus/) • [文档](docs/) • [API参考](#api-文档) • [部署指南](#部署)
+[官网](https://huisheen.xzt.plus/)
 
 </div>
 
@@ -197,6 +197,26 @@ Railway是一个云平台，可以部署Node.js应用。
 
 #### 使用Railway CLI部署
 
+1. **安装Railway CLI**
+   ```bash
+   npm install -g @railway/cli
+   ```
+
+2. **登录Railway**
+   ```bash
+   railway login
+   ```
+
+3. **初始化项目**
+   ```bash
+   railway init
+   ```
+
+4. **部署应用**
+   ```bash
+   railway up
+   ```
+
 ### Docker 部署
 
 ```bash
@@ -277,7 +297,7 @@ volumes:
 ### 🔗 快速开始
 
 - **基础URL**: `https://huisheen.xzt.plus/api`
-- **详细文档**: [开发者指南](docs/developer-guide.md)
+- **详细文档**: [开发者指南](public/docs/developer-guide.md)
 - **Demo演示**: [集成示例](demo/)
 
 ### 🔄 主要功能
@@ -315,8 +335,8 @@ Authorization: Bearer <外部API Token>
 ### 📖 完整文档
 
 详细的API文档、代码示例和集成指南，请查看：
-- [开发者指南](docs/developer-guide.md) - 完整API参考
-- [用户指南](docs/user-guide.md) - 使用说明  
+- [开发者指南](public/docs/developer-guide.md) - 完整API参考
+- [用户指南](public/docs/user-guide.md) - 使用说明  
 - [演示应用](demo/) - 集成示例代码
 
 ## ⚙️ 配置说明
