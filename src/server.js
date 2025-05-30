@@ -5,6 +5,7 @@ const rateLimit = require('express-rate-limit');
 const connectDB = require('./config/database');
 const config = require('./config/config');
 const PollingService = require('./services/PollingService');
+const path = require('path');
 
 // 导入路由
 const authRoutes = require('./routes/auth');
@@ -117,13 +118,21 @@ app.get('/api', (req, res) => {
   });
 });
 
-// 404处理
-app.use('*', (req, res) => {
-  res.status(404).json({
-    error: '接口不存在',
-    path: req.originalUrl,
-    method: req.method
-  });
+// 前端路由支持 - 所有非API请求都返回主页面
+app.get('*', (req, res) => {
+  // 排除API路径和静态资源
+  if (req.path.startsWith('/api/') || 
+      req.path.startsWith('/health') || 
+      req.path.includes('.')) {
+    return res.status(404).json({
+      error: '接口不存在',
+      path: req.originalUrl,
+      method: req.method
+    });
+  }
+  
+  // 返回主页面，让前端路由处理
+  res.sendFile(path.join(__dirname, '../public/index.html'));
 });
 
 // 错误处理中间件

@@ -8,7 +8,11 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" rel="stylesheet" id="highlight-theme">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.4.0/github-markdown-light.min.css" rel="stylesheet" id="markdown-theme">
     <script>
         // Tailwind CSS dark mode configuration
         tailwind.config = {
@@ -158,6 +162,52 @@
         .custom-dropdown .dropdown-menu::-webkit-scrollbar-thumb:hover {
             background: rgba(156, 163, 175, 0.8);
         }
+        
+        /* 文档页面样式 */
+        .sidebar-nav {
+            position: sticky;
+            top: 2rem;
+            max-height: calc(100vh - 4rem);
+            overflow-y: auto;
+        }
+        
+        .sidebar-nav::-webkit-scrollbar {
+            width: 4px;
+        }
+        .sidebar-nav::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .sidebar-nav::-webkit-scrollbar-thumb {
+            background: rgba(156, 163, 175, 0.5);
+            border-radius: 2px;
+        }
+        
+        /* GitHub Markdown 样式自定义 */
+        .markdown-body {
+            box-sizing: border-box;
+            min-width: 200px;
+            max-width: none;
+            margin: 0;
+            padding: 0;
+            background: transparent;
+        }
+        
+        .markdown-body h1,
+        .markdown-body h2,
+        .markdown-body h3,
+        .markdown-body h4,
+        .markdown-body h5,
+        .markdown-body h6 {
+            color: inherit;
+        }
+        
+        .markdown-body pre {
+            background: #f6f8fa;
+        }
+        
+        .dark .markdown-body pre {
+            background: #161b22;
+        }
     </style>
 </head>
 <body class="bg-gray-50 dark:bg-gray-900 min-h-screen theme-transition" :class="{ 'dark': darkMode }">
@@ -175,10 +225,26 @@
                     
                     <!-- 桌面端导航 -->
                     <div class="hidden md:flex items-center space-x-4">
+                        <!-- 首页链接 -->
+                        <button @click="navigateTo('/')" 
+                                :class="isHomePage ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'"
+                                class="px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                            <i class="fas fa-home mr-2"></i>首页
+                        </button>
+                        
+                        <!-- 用户页面链接 -->
+                        <button v-if="user" @click="navigateTo('/user')" 
+                                :class="isUserPage ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'"
+                                class="px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                            <i class="fas fa-tachometer-alt mr-2"></i>控制台
+                        </button>
+                        
                         <!-- 文档链接 -->
-                        <a href="/docs.html" class="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                        <button @click="navigateTo('/docs')" 
+                                :class="isDocsPage ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'"
+                                class="px-3 py-2 rounded-md text-sm font-medium transition-colors">
                             <i class="fas fa-book mr-2"></i>文档
-                        </a>
+                        </button>
                         
                         <!-- 夜间模式切换按钮 -->
                         <button @click="toggleDarkMode" 
@@ -190,7 +256,7 @@
                         
                         <template v-if="user">
                             <span class="text-gray-700 dark:text-gray-300">欢迎，{{ user.username }}</span>
-                            <button @click="logout" class="bg-gray-500 dark:bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-600 dark:hover:bg-gray-700 transition">
+                            <button @click="logout()" class="bg-gray-500 dark:bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-600 dark:hover:bg-gray-700 transition">
                                 退出登录
                             </button>
                         </template>
@@ -225,17 +291,32 @@
                 <transition name="mobile-menu">
                     <div v-if="showMobileMenu" class="md:hidden border-t border-gray-200 dark:border-gray-700 py-4 bg-white dark:bg-gray-800">
                         <div class="space-y-2">
+                            <!-- 首页链接 -->
+                            <button @click="navigateTo('/'); showMobileMenu = false"
+                                    :class="isHomePage ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : ''"
+                                    class="block w-full text-left px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+                                <i class="fas fa-home mr-2"></i>首页
+                            </button>
+                            
+                            <!-- 用户控制台链接 -->
+                            <button v-if="user" @click="navigateTo('/user'); showMobileMenu = false"
+                                    :class="isUserPage ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : ''"
+                                    class="block w-full text-left px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+                                <i class="fas fa-tachometer-alt mr-2"></i>控制台
+                            </button>
+                            
                             <!-- 文档链接 -->
-                            <a href="/docs.html" @click="showMobileMenu = false"
-                               class="block w-full text-left px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+                            <button @click="navigateTo('/docs'); showMobileMenu = false"
+                                    :class="isDocsPage ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : ''"
+                                    class="block w-full text-left px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
                                 <i class="fas fa-book mr-2"></i>文档中心
-                            </a>
+                            </button>
                             
                             <template v-if="user">
                                 <div class="px-4 py-2 text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">
                                     欢迎，{{ user.username }}
                                 </div>
-                                <button @click="logout; showMobileMenu = false" 
+                                <button @click="logout(); showMobileMenu = false" 
                                         class="block w-full text-left px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
                                     <i class="fas fa-sign-out-alt mr-2"></i>退出登录
                                 </button>
@@ -258,8 +339,8 @@
 
         <!-- 主内容区域 -->
         <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-            <!-- 未登录状态 -->
-            <div v-if="!user" class="space-y-12">
+            <!-- 首页内容 -->
+            <div v-if="isHomePage" class="space-y-12">
                 <!-- Hero 区域 -->
                 <div class="text-center py-8 sm:py-12">
                     <div class="mb-8">
@@ -272,13 +353,17 @@
                         专注于通知接收的开源服务平台，支持主动和被动两种订阅模式，让您不再错过任何重要信息
                     </p>
                     <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
-                        <button @click="showRegister = true" 
+                        <button v-if="!user" @click="showRegister = true" 
                                 class="w-full sm:w-auto bg-blue-600 dark:bg-blue-700 text-white px-8 py-3 rounded-lg text-lg font-semibold hover:bg-blue-700 dark:hover:bg-blue-800 transition transform hover:scale-105">
                             <i class="fas fa-rocket mr-2"></i>立即开始
                         </button>
-                        <button @click="showLogin = true" 
+                        <button v-if="!user" @click="showLogin = true" 
                                 class="w-full sm:w-auto border-2 border-blue-600 dark:border-blue-500 text-blue-600 dark:text-blue-400 px-8 py-3 rounded-lg text-lg font-semibold hover:bg-blue-50 dark:hover:bg-blue-900/30 transition">
                             <i class="fas fa-sign-in-alt mr-2"></i>登录账户
+                        </button>
+                        <button v-if="user" @click="navigateTo('/user')" 
+                                class="w-full sm:w-auto bg-green-600 dark:bg-green-700 text-white px-8 py-3 rounded-lg text-lg font-semibold hover:bg-green-700 dark:hover:bg-green-800 transition transform hover:scale-105">
+                            <i class="fas fa-tachometer-alt mr-2"></i>进入控制台
                         </button>
                     </div>
                 </div>
@@ -437,9 +522,13 @@
                             </div>
                         </div>
                         <div class="text-center mt-8">
-                            <button @click="showRegister = true" 
+                            <button v-if="!user" @click="showRegister = true" 
                                     class="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-3 rounded-lg text-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition transform hover:scale-105 shadow-lg">
                                 <i class="fas fa-rocket mr-2"></i>立即注册，开始使用
+                            </button>
+                            <button v-if="user" @click="navigateTo('/user')" 
+                                    class="bg-gradient-to-r from-green-600 to-blue-600 text-white px-8 py-3 rounded-lg text-lg font-semibold hover:from-green-700 hover:to-blue-700 transition transform hover:scale-105 shadow-lg">
+                                <i class="fas fa-tachometer-alt mr-2"></i>进入控制台
                             </button>
                         </div>
                     </div>
@@ -467,8 +556,8 @@
                     </div>
             </div>
 
-            <!-- 已登录状态 -->
-            <div v-if="user" class="space-y-6">
+            <!-- 用户页面内容 -->
+            <div v-if="isUserPage && user" class="space-y-6">
                 <!-- 统计卡片 -->
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-8">
                     <div class="bg-white dark:bg-gray-800 p-4 md:p-6 rounded-lg shadow-md border dark:border-gray-700 theme-transition">
@@ -928,7 +1017,78 @@
                     </div>
                 </div>
             </div>
+
+            <!-- 文档页面内容 -->
+            <div v-if="isDocsPage" class="space-y-6">
+                <div class="flex flex-col lg:flex-row gap-8">
+                    <!-- 侧边栏导航 -->
+                    <div class="lg:w-64 flex-shrink-0">
+                        <div class="sidebar-nav px-2">
+                            <!-- 文档类型切换 -->
+                            <div class="mb-6">
+                                <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">文档类型</h3>
+                                <div class="space-y-2">
+                                    <button @click="switchDocType('user')" 
+                                            :class="currentDocType === 'user' ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'"
+                                            class="w-full text-left px-4 py-2 rounded-lg transition">
+                                        <i class="fas fa-user mr-2"></i>用户文档
+                                    </button>
+                                    <button @click="switchDocType('developer')" 
+                                            :class="currentDocType === 'developer' ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'"
+                                            class="w-full text-left px-4 py-2 rounded-lg transition">
+                                        <i class="fas fa-code mr-2"></i>开发者文档
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- 目录导航 -->
+                            <div class="mb-6" v-if="tableOfContents">
+                                <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">目录</h3>
+                                <div class="space-y-1" v-html="tableOfContents" @click="handleTocClick"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 主文档内容 -->
+                    <div class="flex-1 min-w-0">
+                        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 md:p-8 theme-transition">
+                            <!-- 面包屑导航 -->
+                            <div class="mb-6 text-sm text-gray-600 dark:text-gray-400">
+                                <button @click="navigateTo('/')" class="hover:text-blue-600 dark:hover:text-blue-400 transition">首页</button>
+                                <span class="mx-2">/</span>
+                                <button @click="navigateTo('/docs')" class="hover:text-blue-600 dark:hover:text-blue-400 transition">文档</button>
+                                <span class="mx-2">/</span>
+                                <span class="text-gray-900 dark:text-white">{{ currentDocType === 'developer' ? '开发者指南' : '用户指南' }}</span>
+                            </div>
+                            
+                            <!-- 加载状态 -->
+                            <div v-if="documentLoading" class="text-center py-12">
+                                <i class="fas fa-spinner fa-spin text-3xl text-gray-400 mb-4"></i>
+                                <p class="text-gray-600 dark:text-gray-400">加载文档中...</p>
+                            </div>
+
+                            <!-- 错误状态 -->
+                            <div v-else-if="documentError" class="text-center py-12">
+                                <i class="fas fa-exclamation-triangle text-3xl text-red-500 mb-4"></i>
+                                <p class="text-red-600 dark:text-red-400 mb-4">{{ documentError }}</p>
+                                <button @click="loadDocument" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition">
+                                    <i class="fas fa-redo mr-2"></i>重新加载
+                                </button>
+                            </div>
+
+                            <!-- 文档内容 -->
+                            <div v-else class="markdown-body" v-html="documentContent"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
+
+        <!-- 返回顶部按钮 -->
+        <button v-if="showBackToTop" @click="scrollToTop" 
+                class="fixed bottom-8 right-8 bg-blue-500 text-white w-12 h-12 rounded-full shadow-lg hover:bg-blue-600 transition transform hover:scale-110 z-40">
+            <i class="fas fa-arrow-up"></i>
+        </button>
 
         <!-- 登录弹窗 -->
         <transition name="modal">

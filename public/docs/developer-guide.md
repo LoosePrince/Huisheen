@@ -383,7 +383,7 @@ GET /api/external/notifications?type=error&priority=high&limit=20
 
 1. **克隆代码**
 ```bash
-git clone https://github.com/your-repo/huisheen.git
+git clone https://github.com/LoosePrince/Huisheen.git
 cd huisheen
 ```
 
@@ -458,7 +458,7 @@ volumes:
 
 ## <i class="fas fa-comments text-green-500"></i> 社区和支持
 
-- **GitHub仓库**: [github.com/your-repo/huisheen](https://github.com/your-repo/huisheen)
+- **GitHub仓库**: [https://github.com/LoosePrince/Huisheen/issues](https://github.com/LoosePrince/Huisheen/issues)
 - **问题反馈**: 在GitHub Issues中报告问题
 - **功能请求**: 提交Pull Request或创建Feature Request
 - **文档贡献**: 欢迎改进文档和示例

@@ -256,7 +256,7 @@ curl -X POST https://your-domain.com/api/notify \
 
 如果您遇到问题，可以：
 
-1. 查看[开发者文档](/docs)了解技术细节
+1. 查看 开发者文档 了解技术细节
 2. 在GitHub上提交Issue
 3. 参与社区讨论
 

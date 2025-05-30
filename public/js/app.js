@@ -9,6 +9,9 @@ createApp({
             message: null,
             currentTab: 'notifications',
             
+            // 路由状态
+            currentRoute: '/',
+            
             // 夜间模式状态
             darkMode: localStorage.getItem('darkMode') === 'true' || false,
             
@@ -85,11 +88,41 @@ createApp({
                 service: false,
                 mode: false,
                 mobileTab: false
-            }
+            },
+            
+            // 文档相关状态
+            documentContent: '',
+            tableOfContents: '',
+            documentLoading: false,
+            documentError: null,
+            showBackToTop: false
         };
     },
     
     computed: {
+        // 判断是否在首页
+        isHomePage() {
+            return this.currentRoute === '/';
+        },
+        
+        // 判断是否在用户页面
+        isUserPage() {
+            return this.currentRoute === '/user';
+        },
+        
+        // 判断是否在文档页面
+        isDocsPage() {
+            return this.currentRoute.startsWith('/docs');
+        },
+        
+        // 获取当前文档类型
+        currentDocType() {
+            if (this.currentRoute === '/docs/developer-guide') {
+                return 'developer';
+            }
+            return 'user'; // 默认为用户文档
+        },
+        
         // 统计数据计算属性
         totalNotifications() {
             return this.notifications.length;
@@ -218,8 +251,19 @@ createApp({
     mounted() {
         this.initAxios();
         this.initDarkMode();
+        
+        // 如果有token，先尝试加载用户数据，然后初始化路由
         if (this.token) {
-            this.loadUserData();
+            this.loadUserData().then(() => {
+                this.initRouter();
+            }).catch(() => {
+                // 如果token无效，清除并初始化路由
+                this.logout(true); // 跳过导航，避免初始化时的路由问题
+                this.initRouter();
+            });
+        } else {
+            // 没有token直接初始化路由
+            this.initRouter();
         }
         
         // 每秒更新一次冷却时间显示
@@ -233,16 +277,120 @@ createApp({
                 this.closeAllDropdowns();
             }
         });
+        
+        // 监听滚动事件，用于返回顶部按钮
+        window.addEventListener('scroll', this.handleScroll);
     },
     
     methods: {
+        // 初始化路由
+        initRouter() {
+            // 获取当前路径
+            this.currentRoute = window.location.pathname;
+            
+            // 监听浏览器前进后退
+            window.addEventListener('popstate', () => {
+                this.currentRoute = window.location.pathname;
+                this.handleRouteChange();
+            });
+            
+            // 处理初始路由
+            this.handleRouteChange();
+        },
+        
+        // 路由导航
+        navigateTo(path) {
+            // 分离路径和hash
+            const [pathname, hash] = path.split('#');
+            
+            if (this.currentRoute === pathname) {
+                // 如果路径相同但有hash，只需滚动到指定位置
+                if (hash) {
+                    // 更新URL hash
+                    window.location.hash = hash;
+                    // 延迟滚动，确保内容已渲染
+                    setTimeout(() => {
+                        this.scrollToSection(decodeURIComponent(hash));
+                    }, 100);
+                }
+                return;
+            }
+            
+            this.currentRoute = pathname;
+            // 完整的URL包含hash
+            const fullPath = hash ? `${pathname}#${hash}` : pathname;
+            window.history.pushState({}, '', fullPath);
+            this.handleRouteChange();
+        },
+        
+        // 处理路由变化
+        handleRouteChange() {
+            // 关闭移动端菜单
+            this.showMobileMenu = false;
+            
+            // 处理文档路由
+            if (this.currentRoute === '/docs') {
+                // /docs 默认跳转到 /docs/user-guide
+                this.navigateTo('/docs/user-guide');
+                return;
+            }
+            
+            // 如果是文档页面，加载对应文档
+            if (this.isDocsPage) {
+                this.loadDocument();
+                return;
+            }
+            
+            // 检查用户权限 - 如果访问用户页面但既没有用户信息也没有token
+            if (this.currentRoute === '/user' && !this.user && !this.token) {
+                // 如果访问用户页面但未登录，跳转到首页并显示登录弹窗
+                this.navigateTo('/');
+                this.showLogin = true;
+                return;
+            }
+            
+            // 如果有token但没有用户信息，尝试加载用户数据
+            if (this.currentRoute === '/user' && this.token && !this.user) {
+                this.loadUserData().catch(() => {
+                    // 如果加载失败（token无效），跳转到首页
+                    this.navigateTo('/');
+                    this.showLogin = true;
+                });
+                return;
+            }
+            
+            // 如果已登录用户访问首页，可以选择跳转到用户页面
+            // if (this.currentRoute === '/' && this.user) {
+            //     this.navigateTo('/user');
+            //     return;
+            // }
+        },
+        
         // 初始化夜间模式
         initDarkMode() {
             // 应用夜间模式到document.documentElement
             if (this.darkMode) {
                 document.documentElement.classList.add('dark');
+                // 设置暗色主题
+                const markdownTheme = document.getElementById('markdown-theme');
+                const highlightTheme = document.getElementById('highlight-theme');
+                if (markdownTheme) {
+                    markdownTheme.href = 'https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.4.0/github-markdown-dark.min.css';
+                }
+                if (highlightTheme) {
+                    highlightTheme.href = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css';
+                }
             } else {
                 document.documentElement.classList.remove('dark');
+                // 设置亮色主题
+                const markdownTheme = document.getElementById('markdown-theme');
+                const highlightTheme = document.getElementById('highlight-theme');
+                if (markdownTheme) {
+                    markdownTheme.href = 'https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.4.0/github-markdown-light.min.css';
+                }
+                if (highlightTheme) {
+                    highlightTheme.href = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css';
+                }
             }
         },
         
@@ -253,8 +401,26 @@ createApp({
             
             if (this.darkMode) {
                 document.documentElement.classList.add('dark');
+                // 切换到暗色主题
+                const markdownTheme = document.getElementById('markdown-theme');
+                const highlightTheme = document.getElementById('highlight-theme');
+                if (markdownTheme) {
+                    markdownTheme.href = 'https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.4.0/github-markdown-dark.min.css';
+                }
+                if (highlightTheme) {
+                    highlightTheme.href = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css';
+                }
             } else {
                 document.documentElement.classList.remove('dark');
+                // 切换到亮色主题
+                const markdownTheme = document.getElementById('markdown-theme');
+                const highlightTheme = document.getElementById('highlight-theme');
+                if (markdownTheme) {
+                    markdownTheme.href = 'https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.4.0/github-markdown-light.min.css';
+                }
+                if (highlightTheme) {
+                    highlightTheme.href = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css';
+                }
             }
             
             this.showMessage(this.darkMode ? '已切换到夜间模式' : '已切换到日间模式');
@@ -320,6 +486,9 @@ createApp({
                 this.showLogin = false;
                 this.loginForm = { email: '', password: '' };
                 this.showMessage('登录成功！');
+                
+                // 登录成功后跳转到用户页面
+                this.navigateTo('/user');
                 this.loadUserData();
             } catch (error) {
                 this.showMessage(error.response?.data?.error || '登录失败', 'error');
@@ -342,6 +511,9 @@ createApp({
                 this.showRegister = false;
                 this.registerForm = { username: '', email: '', password: '' };
                 this.showMessage('注册成功！');
+                
+                // 注册成功后跳转到用户页面
+                this.navigateTo('/user');
                 this.loadUserData();
             } catch (error) {
                 this.showMessage(error.response?.data?.error || '注册失败', 'error');
@@ -351,7 +523,7 @@ createApp({
         },
         
         // 退出登录
-        logout() {
+        logout(skipNavigation = false) {
             this.user = null;
             this.token = null;
             this.notifications = [];
@@ -360,7 +532,12 @@ createApp({
             this.notifyCode = null;
             localStorage.removeItem('token');
             delete axios.defaults.headers.common['Authorization'];
-            this.showMessage('已退出登录');
+            
+            // 退出登录后跳转到首页（除非明确跳过导航）
+            if (!skipNavigation) {
+                this.navigateTo('/');
+                this.showMessage('已退出登录');
+            }
         },
         
         // 加载用户数据
@@ -1097,6 +1274,176 @@ createApp({
                 settings: '⚙️ 账户设置'
             };
             return tabTexts[this.currentTab] || this.currentTab;
+        },
+        
+        // 文档相关方法
+        
+        // 切换文档类型
+        switchDocType(type) {
+            const targetRoute = type === 'developer' ? '/docs/developer-guide' : '/docs/user-guide';
+            this.navigateTo(targetRoute);
+        },
+        
+        // 加载文档
+        async loadDocument() {
+            this.documentLoading = true;
+            this.documentError = null;
+            
+            try {
+                const fileName = this.currentDocType === 'developer' ? 'developer-guide.md' : 'user-guide.md';
+                // 直接请求静态文件，不使用API路径
+                const response = await axios.get(`/docs/${fileName}`, {
+                    baseURL: '' // 覆盖默认的baseURL
+                });
+                
+                // 创建自定义渲染器
+                if (typeof marked !== 'undefined') {
+                    const renderer = new marked.Renderer();
+                    renderer.heading = function(text, level) {
+                        const id = text.toLowerCase().replace(/[^\w\u4e00-\u9fa5]+/g, '-');
+                        return `<h${level} id="${id}">${text}</h${level}>`;
+                    };
+                    
+                    // 配置marked选项
+                    marked.setOptions({
+                        renderer: renderer,
+                        highlight: function(code, lang) {
+                            if (typeof hljs !== 'undefined' && lang && hljs.getLanguage(lang)) {
+                                return hljs.highlight(code, { language: lang }).value;
+                            }
+                            if (typeof hljs !== 'undefined') {
+                                return hljs.highlightAuto(code).value;
+                            }
+                            return code;
+                        },
+                        breaks: true,
+                        gfm: true
+                    });
+                    
+                    // 解析Markdown
+                    this.documentContent = marked.parse(response.data);
+                } else {
+                    // 如果没有marked，直接显示纯文本
+                    this.documentContent = `<pre>${response.data}</pre>`;
+                }
+                
+                // 生成目录
+                this.generateTableOfContents(response.data);
+                
+                // 在下一个tick中处理滚动，确保DOM已更新
+                this.$nextTick(() => {
+                    // 检查URL中是否有hash片段
+                    const hash = window.location.hash;
+                    if (hash) {
+                        // 移除#号，并处理URL编码
+                        const sectionId = decodeURIComponent(hash.substring(1));
+                        // 延迟滚动，确保内容已完全渲染
+                        setTimeout(() => {
+                            this.scrollToSection(sectionId);
+                        }, 100);
+                    } else {
+                        // 没有hash时滚动到顶部
+                        window.scrollTo(0, 0);
+                    }
+                });
+                
+            } catch (error) {
+                console.error('加载文档失败:', error);
+                this.documentError = '加载文档失败，请稍后重试';
+            } finally {
+                this.documentLoading = false;
+            }
+        },
+        
+        // 生成目录
+        generateTableOfContents(markdown) {
+            // 首先移除代码块内容，避免代码块中的#被识别为标题
+            let cleanMarkdown = markdown;
+            
+            // 移除代码块（```包围的内容）
+            cleanMarkdown = cleanMarkdown.replace(/```[\s\S]*?```/g, '');
+            
+            // 移除行内代码（`包围的内容）
+            cleanMarkdown = cleanMarkdown.replace(/`[^`]*`/g, '');
+            
+            const headings = cleanMarkdown.match(/^#{1,6}\s.+$/gm) || [];
+            let toc = '';
+            
+            headings.forEach(heading => {
+                const level = heading.match(/^#+/)[0].length;
+                const text = heading.replace(/^#+\s/, '');
+                const id = text.toLowerCase().replace(/[^\w\u4e00-\u9fa5]+/g, '-');
+                const indent = level > 1 ? `ml-${(level - 1) * 4}` : '';
+                
+                toc += `<div class="${indent} mb-1">
+                    <a href="#${id}" 
+                       data-section-id="${id}"
+                       class="toc-link text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 block py-1 transition cursor-pointer">
+                        ${text}
+                    </a>
+                </div>`;
+            });
+            
+            this.tableOfContents = toc;
+        },
+        
+        // 处理滚动事件
+        handleScroll() {
+            this.showBackToTop = window.pageYOffset > 300;
+        },
+        
+        // 返回顶部
+        scrollToTop() {
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        },
+        
+        // 滚动到指定章节
+        scrollToSection(sectionId) {
+            // 尝试多种方式查找元素
+            let element = document.getElementById(sectionId);
+            
+            // 如果直接查找失败，尝试查找data-section-id属性
+            if (!element) {
+                element = document.querySelector(`[data-section-id="${sectionId}"]`);
+            }
+            
+            // 如果还是找不到，尝试根据文本内容查找标题
+            if (!element) {
+                const headings = document.querySelectorAll('h1, h2, h3, h4, h5, h6');
+                for (let heading of headings) {
+                    const headingText = heading.textContent.trim();
+                    const headingId = headingText.toLowerCase().replace(/[^\w\u4e00-\u9fa5]+/g, '-');
+                    if (headingId === sectionId || headingText === sectionId) {
+                        element = heading;
+                        break;
+                    }
+                }
+            }
+            
+            if (element) {
+                element.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            } else {
+                console.warn(`找不到ID为 "${sectionId}" 的元素`);
+            }
+        },
+        
+        // 处理目录点击事件（事件委托）
+        handleTocClick(event) {
+            // 检查点击的是否是目录链接
+            const link = event.target.closest('.toc-link');
+            if (link) {
+                event.preventDefault();
+                const sectionId = link.getAttribute('data-section-id');
+                if (sectionId) {
+                    this.scrollToSection(sectionId);
+                }
+            }
         }
     }
 }).mount('#app'); 
