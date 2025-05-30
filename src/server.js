@@ -12,6 +12,7 @@ const authRoutes = require('./routes/auth');
 const subscriptionRoutes = require('./routes/subscriptions');
 const notificationRoutes = require('./routes/notifications');
 const externalRoutes = require('./routes/external');
+const adminRoutes = require('./routes/admin');
 
 const app = express();
 
@@ -92,6 +93,32 @@ app.use('/api/auth', authRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/external', externalRoutes);
+
+// 管理员路由 - 仅当配置启用时才加载
+if (config.admin.enabled) {
+  app.use('/api/admin', adminRoutes);
+  console.log('🔐 管理员功能已启用');
+  
+  if (config.admin.emails.length > 0) {
+    console.log(`👤 管理员邮箱: ${config.admin.emails.join(', ')}`);
+  } else {
+    console.warn('⚠️ 警告: 未配置管理员邮箱，请设置 ADMIN_EMAILS 环境变量');
+  }
+}
+
+// 特殊处理 /admin 路径
+app.get('/admin', (req, res) => {
+  if (config.admin.enabled) {
+    res.sendFile(path.join(__dirname, 'admin.html'));
+  } else {
+    // 管理员功能未启用，返回404
+    res.status(404).json({
+      error: '接口不存在',
+      path: req.originalUrl,
+      method: req.method
+    });
+  }
+});
 
 // 健康检查端点
 app.get('/health', (req, res) => {

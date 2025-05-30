@@ -47,6 +47,26 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  // 管理员角色
+  isAdmin: {
+    type: Boolean,
+    default: false
+  },
+  // 邮箱验证相关字段
+  isEmailVerified: {
+    type: Boolean,
+    default: false
+  },
+  emailVerificationCode: {
+    type: String
+  },
+  emailVerificationExpires: {
+    type: Date
+  },
+  emailVerificationAttempts: {
+    type: Number,
+    default: 0
+  },
   createdAt: {
     type: Date,
     default: Date.now
@@ -95,6 +115,152 @@ userSchema.methods.generateNotifyCode = function() {
 userSchema.methods.verifyNotifyCode = function(code) {
   const now = new Date();
   return this.verificationCode === code && this.verificationCodeExpires > now;
+};
+
+// 生成邮箱验证码
+userSchema.methods.generateEmailVerificationCode = function() {
+  // 生成6位数字验证码
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  
+  this.emailVerificationCode = code;
+  this.emailVerificationExpires = new Date(Date.now() + 10 * 60 * 1000); // 10分钟过期
+  this.emailVerificationAttempts = 0; // 重置尝试次数
+  
+  return code;
+};
+
+// 验证邮箱验证码
+userSchema.methods.verifyEmailCode = function(code) {
+  const now = new Date();
+  
+  // 检查验证码是否存在和未过期
+  if (!this.emailVerificationCode || !this.emailVerificationExpires) {
+    return { success: false, message: '验证码不存在' };
+  }
+  
+  if (this.emailVerificationExpires < now) {
+    return { success: false, message: '验证码已过期' };
+  }
+  
+  // 检查尝试次数
+  if (this.emailVerificationAttempts >= 5) {
+    return { success: false, message: '验证尝试次数过多，请重新获取验证码' };
+  }
+  
+  // 验证码错误
+  if (this.emailVerificationCode !== code) {
+    this.emailVerificationAttempts += 1;
+    return { success: false, message: '验证码错误' };
+  }
+  
+  // 验证成功
+  this.isEmailVerified = true;
+  this.emailVerificationCode = undefined;
+  this.emailVerificationExpires = undefined;
+  this.emailVerificationAttempts = 0;
+  
+  return { success: true, message: '邮箱验证成功' };
+};
+
+// 计算用户存储使用情况
+userSchema.methods.getStorageUsage = async function() {
+  const mongoose = require('mongoose');
+  const Notification = mongoose.model('Notification');
+  const Subscription = mongoose.model('Subscription');
+  
+  try {
+    // 获取用户的所有通知
+    const notifications = await Notification.find({ userId: this._id });
+    
+    // 获取用户的所有订阅
+    const subscriptions = await Subscription.find({ userId: this._id });
+    
+    // 计算通知数据大小
+    let notificationsSize = 0;
+    notifications.forEach(notification => {
+      // 计算每个字段的大小（字符串按UTF-8编码计算）
+      const title = notification.title || '';
+      const content = notification.content || '';
+      const type = notification.type || '';
+      const priority = notification.priority || '';
+      const sourceName = notification.source?.name || '';
+      const sourceUrl = notification.source?.url || '';
+      const sourceIcon = notification.source?.icon || '';
+      const callbackUrl = notification.callbackUrl || '';
+      const externalId = notification.externalId || '';
+      
+      // 计算metadata和rawData的JSON字符串大小
+      const metadata = notification.metadata ? JSON.stringify(notification.metadata) : '';
+      const rawData = notification.rawData ? JSON.stringify(notification.rawData) : '';
+      
+      // 累加大小（UTF-8编码，中文字符约3字节）
+      notificationsSize += Buffer.byteLength(title, 'utf8');
+      notificationsSize += Buffer.byteLength(content, 'utf8');
+      notificationsSize += Buffer.byteLength(type, 'utf8');
+      notificationsSize += Buffer.byteLength(priority, 'utf8');
+      notificationsSize += Buffer.byteLength(sourceName, 'utf8');
+      notificationsSize += Buffer.byteLength(sourceUrl, 'utf8');
+      notificationsSize += Buffer.byteLength(sourceIcon, 'utf8');
+      notificationsSize += Buffer.byteLength(callbackUrl, 'utf8');
+      notificationsSize += Buffer.byteLength(externalId, 'utf8');
+      notificationsSize += Buffer.byteLength(metadata, 'utf8');
+      notificationsSize += Buffer.byteLength(rawData, 'utf8');
+      
+      // 其他字段的估算大小（ObjectId, Date, Boolean等）
+      notificationsSize += 100; // 基础字段大小估算
+    });
+    
+    // 计算订阅数据大小
+    let subscriptionsSize = 0;
+    subscriptions.forEach(subscription => {
+      const serviceHost = subscription.serviceHost || '';
+      const thirdPartyName = subscription.thirdPartyName || '';
+      const thirdPartyUrl = subscription.thirdPartyUrl || '';
+      const mode = subscription.mode || '';
+      const apiEndpoint = subscription.apiEndpoint || '';
+      const token = subscription.token || '';
+      const config = subscription.config ? JSON.stringify(subscription.config) : '';
+      
+      subscriptionsSize += Buffer.byteLength(serviceHost, 'utf8');
+      subscriptionsSize += Buffer.byteLength(thirdPartyName, 'utf8');
+      subscriptionsSize += Buffer.byteLength(thirdPartyUrl, 'utf8');
+      subscriptionsSize += Buffer.byteLength(mode, 'utf8');
+      subscriptionsSize += Buffer.byteLength(apiEndpoint, 'utf8');
+      subscriptionsSize += Buffer.byteLength(token, 'utf8');
+      subscriptionsSize += Buffer.byteLength(config, 'utf8');
+      
+      // 其他字段的估算大小
+      subscriptionsSize += 80; // 基础字段大小估算
+    });
+    
+    const totalSize = notificationsSize + subscriptionsSize;
+    const maxSize = 1024 * 1024; // 1MB
+    const usagePercentage = Math.min((totalSize / maxSize) * 100, 100);
+    
+    return {
+      notifications: {
+        count: notifications.length,
+        size: notificationsSize
+      },
+      subscriptions: {
+        count: subscriptions.length,
+        size: subscriptionsSize
+      },
+      total: {
+        size: totalSize,
+        maxSize: maxSize,
+        usagePercentage: usagePercentage,
+        remainingSize: Math.max(maxSize - totalSize, 0)
+      }
+    };
+  } catch (error) {
+    console.error('计算存储使用情况时出错:', error);
+    return {
+      notifications: { count: 0, size: 0 },
+      subscriptions: { count: 0, size: 0 },
+      total: { size: 0, maxSize: 1024 * 1024, usagePercentage: 0, remainingSize: 1024 * 1024 }
+    };
+  }
 };
 
 module.exports = mongoose.model('User', userSchema); 

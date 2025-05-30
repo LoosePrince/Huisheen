@@ -46,5 +46,24 @@ module.exports = {
   verificationCodeExpiresMinutes: parseInt(process.env.VERIFICATION_CODE_EXPIRES_MINUTES) || 5,
   pollingIntervalMinutes: parseInt(process.env.POLLING_INTERVAL_MINUTES) || 5,
   nodeEnv: process.env.NODE_ENV || 'development',
-  websiteDomain: process.env.WEBSITE_DOMAIN || 'localhost:3000'
+  websiteDomain: process.env.WEBSITE_DOMAIN || 'localhost:3000',
+  
+  // 管理员配置
+  admin: {
+    enabled: process.env.ADMIN_ENABLED === 'true' || false,
+    emails: process.env.ADMIN_EMAILS ? process.env.ADMIN_EMAILS.split(',').map(email => email.trim().toLowerCase()) : []
+  },
+  
+  // 邮件服务配置
+  email: {
+    service: process.env.EMAIL_SERVICE || 'gmail', // 邮件服务提供商
+    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+    port: parseInt(process.env.EMAIL_PORT) || 587,
+    secure: process.env.EMAIL_SECURE === 'true' || false, // true for 465, false for other ports
+    auth: {
+      user: process.env.EMAIL_USER || '', // 发送邮件的账户
+      pass: process.env.EMAIL_PASS || ''  // 应用密码或邮箱密码
+    },
+    from: process.env.EMAIL_FROM || process.env.EMAIL_USER || 'noreply@huisheen.com' // 发件人地址
+  }
 }; 

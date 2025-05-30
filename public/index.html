@@ -1096,6 +1096,209 @@
                                 </div>
                             </div>
 
+                        <!-- 邮箱验证 -->
+                        <div v-if="user" class="mt-6">
+                            <h3 class="text-lg font-medium mb-4 text-gray-900 dark:text-white">{{ t.user.settings.emailVerification }}</h3>
+                            <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg theme-transition">
+                                <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">{{ t.user.settings.emailVerificationDesc }}</p>
+                                
+                                <!-- 邮箱状态显示 -->
+                                <div class="flex items-center justify-between mb-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t.user.settings.emailStatus }}</label>
+                                        <div class="flex items-center mt-1">
+                                            <span class="text-sm text-gray-900 dark:text-white font-mono mr-2">{{ user.email }}</span>
+                                            <span v-if="user.isEmailVerified" 
+                                                  class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
+                                                <i class="fas fa-check-circle mr-1"></i>
+                                                {{ t.user.settings.verified }}
+                                            </span>
+                                            <span v-else 
+                                                  class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200">
+                                                <i class="fas fa-exclamation-circle mr-1"></i>
+                                                {{ t.user.settings.unverified }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- 发送验证码按钮 -->
+                                    <div v-if="!user.isEmailVerified">
+                                        <button v-if="!emailVerification.codeSent"
+                                                @click="sendEmailVerification"
+                                                :disabled="emailVerification.isSending"
+                                                class="bg-blue-500 dark:bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-600 dark:hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                                            <span v-if="emailVerification.isSending">
+                                                <i class="fas fa-spinner fa-spin mr-2"></i>{{ t.common.loading }}
+                                            </span>
+                                            <span v-else>
+                                                <i class="fas fa-paper-plane mr-2"></i>{{ t.user.settings.sendVerificationCode }}
+                                            </span>
+                                        </button>
+                                        
+                                        <button v-else-if="emailVerification.remainingTime <= 0"
+                                                @click="sendEmailVerification"
+                                                :disabled="emailVerification.isSending"
+                                                class="bg-gray-500 dark:bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-600 dark:hover:bg-gray-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                                            <span v-if="emailVerification.isSending">
+                                                <i class="fas fa-spinner fa-spin mr-2"></i>{{ t.common.loading }}
+                                            </span>
+                                            <span v-else>
+                                                <i class="fas fa-redo mr-2"></i>{{ t.user.settings.resendCode }}
+                                            </span>
+                                        </button>
+                                        
+                                        <div v-else class="text-sm text-gray-500 dark:text-gray-400">
+                                            <i class="fas fa-clock mr-1"></i>
+                                            {{ formatRemainingTime(emailVerification.remainingTime) }}
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 验证码输入 -->
+                                <div v-if="emailVerification.showCodeInput && !user.isEmailVerified" class="mt-4">
+                                    <div class="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 p-4 rounded-lg">
+                                        <label class="block text-sm font-medium text-blue-700 dark:text-blue-300 mb-2">
+                                            {{ t.user.settings.verificationCode }}
+                                        </label>
+                                        <div class="flex items-center space-x-3">
+                                            <input v-model="emailVerification.code"
+                                                   type="text"
+                                                   maxlength="6"
+                                                   :placeholder="t.user.settings.verificationCodePlaceholder"
+                                                   class="flex-1 border border-blue-300 dark:border-blue-600 dark:bg-blue-900/50 dark:text-white rounded-lg px-3 py-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400 dark:focus:border-blue-400 font-mono text-center text-lg tracking-widest"
+                                                   @keyup.enter="verifyEmailCode">
+                                            <button @click="verifyEmailCode"
+                                                    :disabled="!emailVerification.code || emailVerification.code.length !== 6 || emailVerification.isVerifying"
+                                                    class="bg-blue-500 dark:bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-600 dark:hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                                                <span v-if="emailVerification.isVerifying">
+                                                    <i class="fas fa-spinner fa-spin mr-2"></i>{{ t.common.loading }}
+                                                </span>
+                                                <span v-else>
+                                                    <i class="fas fa-check mr-2"></i>{{ t.user.settings.verifyEmail }}
+                                                </span>
+                                            </button>
+                                        </div>
+                                        <p class="text-xs text-blue-600 dark:text-blue-400 mt-2">
+                                            <i class="fas fa-info-circle mr-1"></i>
+                                            {{ t.user.settings.codeExpireTime }}
+                                        </p>
+                                    </div>
+                                </div>
+                                
+                                <!-- 已验证状态 -->
+                                <div v-if="user.isEmailVerified" class="mt-4">
+                                    <div class="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 p-4 rounded-lg">
+                                        <div class="flex items-center">
+                                            <i class="fas fa-check-circle text-green-500 mr-3 text-xl"></i>
+                                            <div>
+                                                <h4 class="text-sm font-medium text-green-800 dark:text-green-200">
+                                                    {{ t.user.settings.verificationSuccess }}
+                                                </h4>
+                                                <p class="text-xs text-green-600 dark:text-green-400 mt-1">
+                                                    {{ t.user.settings.verificationSuccessDesc }}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 存储使用情况 -->
+                        <div v-if="user && user.storageUsage" class="mt-6">
+                            <h3 class="text-lg font-medium mb-4 text-gray-900 dark:text-white">{{ t.user.settings.storageUsage }}</h3>
+                            <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg theme-transition">
+                                <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">{{ t.user.settings.storageUsageDesc }}</p>
+                                
+                                <!-- 总使用量进度条 -->
+                                <div class="mb-6">
+                                    <div class="flex justify-between items-center mb-2">
+                                        <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t.user.settings.totalUsage }}</span>
+                                        <span class="text-sm text-gray-600 dark:text-gray-400">
+                                            {{ formatSize(user.storageUsage.total.size) }} / {{ formatSize(user.storageUsage.total.maxSize) }}
+                                            ({{ user.storageUsage.total.usagePercentage.toFixed(1) }}%)
+                                        </span>
+                                    </div>
+                                    <div class="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-3 mb-2">
+                                        <div class="h-3 rounded-full transition-all duration-300"
+                                             :class="getStorageProgressColor(user.storageUsage.total.usagePercentage)"
+                                             :style="{ width: Math.min(user.storageUsage.total.usagePercentage, 100) + '%' }">
+                                        </div>
+                                    </div>
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-xs font-medium"
+                                              :class="getStorageUsageLevel(user.storageUsage.total.usagePercentage).color">
+                                            {{ getStorageUsageLevel(user.storageUsage.total.usagePercentage).text }}
+                                        </span>
+                                        <span class="text-xs text-gray-500 dark:text-gray-400">
+                                            {{ t.user.settings.remaining }}: {{ formatSize(user.storageUsage.total.remainingSize) }}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <!-- 使用详情 -->
+                                <div>
+                                    <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">{{ t.user.settings.usageDetails }}</h4>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <!-- 通知数据 -->
+                                        <div class="bg-white dark:bg-gray-600 p-3 rounded-lg theme-transition">
+                                            <div class="flex items-center justify-between mb-2">
+                                                <span class="text-sm font-medium text-gray-700 dark:text-gray-200">
+                                                    <i class="fas fa-bell mr-1 text-blue-500"></i>
+                                                    {{ t.user.settings.notificationsStorage }}
+                                                </span>
+                                                <span class="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 px-2 py-1 rounded">
+                                                    {{ user.storageUsage.notifications.count }}{{ t.user.settings.notifications }}
+                                                </span>
+                                            </div>
+                                            <div class="text-sm text-gray-600 dark:text-gray-300">
+                                                {{ formatSize(user.storageUsage.notifications.size) }}
+                                            </div>
+                                            <div class="w-full bg-gray-200 dark:bg-gray-500 rounded-full h-2 mt-2">
+                                                <div class="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                                                     :style="{ width: Math.min((user.storageUsage.notifications.size / user.storageUsage.total.maxSize) * 100, 100) + '%' }">
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- 订阅数据 -->
+                                        <div class="bg-white dark:bg-gray-600 p-3 rounded-lg theme-transition">
+                                            <div class="flex items-center justify-between mb-2">
+                                                <span class="text-sm font-medium text-gray-700 dark:text-gray-200">
+                                                    <i class="fas fa-link mr-1 text-green-500"></i>
+                                                    {{ t.user.settings.subscriptionsStorage }}
+                                                </span>
+                                                <span class="text-xs bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 px-2 py-1 rounded">
+                                                    {{ user.storageUsage.subscriptions.count }}{{ t.user.settings.subscriptions }}
+                                                </span>
+                                            </div>
+                                            <div class="text-sm text-gray-600 dark:text-gray-300">
+                                                {{ formatSize(user.storageUsage.subscriptions.size) }}
+                                            </div>
+                                            <div class="w-full bg-gray-200 dark:bg-gray-500 rounded-full h-2 mt-2">
+                                                <div class="bg-green-500 h-2 rounded-full transition-all duration-300"
+                                                     :style="{ width: Math.min((user.storageUsage.subscriptions.size / user.storageUsage.total.maxSize) * 100, 100) + '%' }">
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 存储限制说明 -->
+                                <div class="mt-4 p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg">
+                                    <div class="flex items-start">
+                                        <i class="fas fa-info-circle text-blue-500 mt-0.5 mr-2 flex-shrink-0"></i>
+                                        <div class="text-sm text-blue-700 dark:text-blue-300">
+                                            <strong>{{ t.user.settings.storageLimit }}</strong>
+                                            <p class="mt-1 text-xs">
+                                                {{ currentLanguage === 'zh' ? '当前为测试阶段，暂不限制存储使用超出情况。正式版本将提供更大的存储空间和管理功能。' : 'Currently in beta phase, no storage limit enforcement. Official version will provide larger storage space and management features.' }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                             <div v-if="notifyCode">
                             <h3 class="text-lg font-medium mb-4 text-gray-900 dark:text-white">{{ t.user.settings.currentCode }}</h3>
                             <div class="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 p-4 rounded-lg theme-transition">

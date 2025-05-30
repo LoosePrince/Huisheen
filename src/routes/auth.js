@@ -5,6 +5,7 @@ const User = require('../models/User');
 const auth = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
 const config = require('../config/config');
+const emailService = require('../services/emailService');
 
 const router = express.Router();
 
@@ -80,6 +81,12 @@ router.post('/login', [
       return res.status(401).json({ error: '账户已被禁用' });
     }
 
+    // 检查并设置管理员权限（如果配置了管理员邮箱）
+    if (config.admin.enabled && config.admin.emails.includes(user.email.toLowerCase()) && !user.isAdmin) {
+      user.isAdmin = true;
+      console.log(`已将用户 ${user.email} 设置为管理员`);
+    }
+
     // 更新最后登录时间
     user.lastLogin = new Date();
     await user.save();
@@ -99,7 +106,8 @@ router.post('/login', [
         username: user.username,
         email: user.email,
         notifyId: user.notifyId,
-        lastLogin: user.lastLogin
+        lastLogin: user.lastLogin,
+        isAdmin: user.isAdmin
       }
     });
   } catch (error) {
@@ -111,6 +119,9 @@ router.post('/login', [
 // 获取用户信息
 router.get('/me', auth, async (req, res) => {
   try {
+    // 获取存储使用情况
+    const storageUsage = await req.user.getStorageUsage();
+    
     res.json({
       user: {
         id: req.user._id,
@@ -118,7 +129,10 @@ router.get('/me', auth, async (req, res) => {
         email: req.user.email,
         notifyId: req.user.notifyId,
         createdAt: req.user.createdAt,
-        lastLogin: req.user.lastLogin
+        lastLogin: req.user.lastLogin,
+        isEmailVerified: req.user.isEmailVerified,
+        isAdmin: req.user.isAdmin,
+        storageUsage: storageUsage
       }
     });
   } catch (error) {
@@ -141,6 +155,88 @@ router.post('/generate-notify-code', auth, async (req, res) => {
     });
   } catch (error) {
     console.error('生成通知标识码错误:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+// 发送邮箱验证码
+router.post('/send-email-verification', auth, async (req, res) => {
+  try {
+    const user = req.user;
+    
+    // 检查邮件服务是否可用
+    if (!emailService.isAvailable()) {
+      return res.status(503).json({ 
+        error: '邮件服务暂时不可用，请稍后重试或联系管理员配置邮件服务' 
+      });
+    }
+    
+    // 检查是否已经验证
+    if (user.isEmailVerified) {
+      return res.status(400).json({ error: '邮箱已经验证过了' });
+    }
+    
+    // 检查发送频率限制（5分钟内只能发送一次）
+    if (user.emailVerificationExpires && user.emailVerificationExpires > new Date()) {
+      const remainingTime = Math.ceil((user.emailVerificationExpires - new Date()) / 1000 / 60);
+      return res.status(429).json({ 
+        error: `请等待 ${remainingTime} 分钟后再重新发送验证码` 
+      });
+    }
+    
+    // 生成验证码
+    const verificationCode = user.generateEmailVerificationCode();
+    await user.save();
+    
+    // 发送邮件
+    await emailService.sendVerificationEmail(user.email, verificationCode, user.username);
+    
+    res.json({
+      message: '验证码已发送到您的邮箱，请在10分钟内完成验证',
+      expiresIn: '10分钟'
+    });
+  } catch (error) {
+    console.error('发送邮箱验证码错误:', error);
+    res.status(500).json({ error: error.message || '发送验证码失败' });
+  }
+});
+
+// 验证邮箱验证码
+router.post('/verify-email', [
+  body('code').isLength({ min: 6, max: 6 }).withMessage('验证码必须是6位数字'),
+  handleValidationErrors
+], auth, async (req, res) => {
+  try {
+    const { code } = req.body;
+    const user = req.user;
+    
+    // 验证邮箱验证码
+    const result = user.verifyEmailCode(code);
+    
+    if (!result.success) {
+      return res.status(400).json({ error: result.message });
+    }
+    
+    // 保存验证结果
+    await user.save();
+    
+    res.json({
+      message: result.message,
+      isEmailVerified: user.isEmailVerified
+    });
+  } catch (error) {
+    console.error('验证邮箱验证码错误:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+// 获取邮件服务状态（仅用于调试）
+router.get('/email-service-status', auth, async (req, res) => {
+  try {
+    const status = emailService.getStatus();
+    res.json(status);
+  } catch (error) {
+    console.error('获取邮件服务状态错误:', error);
     res.status(500).json({ error: '服务器内部错误' });
   }
 });

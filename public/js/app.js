@@ -100,7 +100,18 @@ createApp({
             tableOfContents: '',
             documentLoading: false,
             documentError: null,
-            showBackToTop: false
+            showBackToTop: false,
+            
+            // 邮箱验证相关状态
+            emailVerification: {
+                isVerifying: false,
+                isSending: false,
+                code: '',
+                showCodeInput: false,
+                codeSent: false,
+                remainingTime: 0,
+                timer: null
+            }
         };
     },
     
@@ -690,6 +701,100 @@ createApp({
             }
         },
         
+        // 发送邮箱验证码
+        async sendEmailVerification() {
+            try {
+                this.emailVerification.isSending = true;
+                const response = await axios.post('/auth/send-email-verification');
+                
+                this.emailVerification.codeSent = true;
+                this.emailVerification.showCodeInput = true;
+                this.emailVerification.code = '';
+                this.showMessage(response.data.message);
+                
+                // 开始倒计时
+                this.startVerificationTimer();
+                
+            } catch (error) {
+                this.showMessage(error.response?.data?.error || '发送验证码失败', 'error');
+            } finally {
+                this.emailVerification.isSending = false;
+            }
+        },
+        
+        // 验证邮箱验证码
+        async verifyEmailCode() {
+            if (!this.emailVerification.code || this.emailVerification.code.length !== 6) {
+                this.showMessage('请输入6位验证码', 'error');
+                return;
+            }
+            
+            try {
+                this.emailVerification.isVerifying = true;
+                const response = await axios.post('/auth/verify-email', {
+                    code: this.emailVerification.code
+                });
+                
+                // 更新用户信息
+                if (this.user) {
+                    this.user.isEmailVerified = response.data.isEmailVerified;
+                }
+                
+                // 重置验证状态
+                this.resetEmailVerificationState();
+                
+                this.showMessage(response.data.message);
+                
+            } catch (error) {
+                this.showMessage(error.response?.data?.error || '验证失败', 'error');
+            } finally {
+                this.emailVerification.isVerifying = false;
+            }
+        },
+        
+        // 开始验证码倒计时
+        startVerificationTimer() {
+            this.emailVerification.remainingTime = 300; // 5分钟倒计时
+            
+            if (this.emailVerification.timer) {
+                clearInterval(this.emailVerification.timer);
+            }
+            
+            this.emailVerification.timer = setInterval(() => {
+                this.emailVerification.remainingTime--;
+                
+                if (this.emailVerification.remainingTime <= 0) {
+                    this.stopVerificationTimer();
+                }
+            }, 1000);
+        },
+        
+        // 停止验证码倒计时
+        stopVerificationTimer() {
+            if (this.emailVerification.timer) {
+                clearInterval(this.emailVerification.timer);
+                this.emailVerification.timer = null;
+            }
+            this.emailVerification.remainingTime = 0;
+        },
+        
+        // 重置邮箱验证状态
+        resetEmailVerificationState() {
+            this.emailVerification.showCodeInput = false;
+            this.emailVerification.codeSent = false;
+            this.emailVerification.code = '';
+            this.emailVerification.isVerifying = false;
+            this.emailVerification.isSending = false;
+            this.stopVerificationTimer();
+        },
+        
+        // 格式化倒计时时间
+        formatRemainingTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+        },
+        
         // 创建被动订阅
         async createPassiveSubscription() {
             try {
@@ -1237,6 +1342,49 @@ createApp({
             } catch (error) {
                 console.error('Time formatting error:', error, timestamp);
                 return this.currentLanguage === 'zh' ? '时间错误' : 'Time error';
+            }
+        },
+        
+        // 格式化存储大小
+        formatSize(bytes) {
+            if (!bytes || bytes === 0) return '0 B';
+            
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(1024));
+            const size = (bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 2);
+            
+            return `${size} ${sizes[i]}`;
+        },
+        
+        // 获取存储使用进度条颜色
+        getStorageProgressColor(percentage) {
+            if (percentage < 50) return 'bg-green-500';
+            if (percentage < 80) return 'bg-yellow-500';
+            return 'bg-red-500';
+        },
+        
+        // 获取存储使用级别文本和样式
+        getStorageUsageLevel(percentage) {
+            if (percentage < 30) {
+                return {
+                    text: this.currentLanguage === 'zh' ? '使用量较低' : 'Low usage',
+                    color: 'text-green-600 dark:text-green-400'
+                };
+            } else if (percentage < 60) {
+                return {
+                    text: this.currentLanguage === 'zh' ? '使用量适中' : 'Moderate usage',
+                    color: 'text-blue-600 dark:text-blue-400'
+                };
+            } else if (percentage < 80) {
+                return {
+                    text: this.currentLanguage === 'zh' ? '使用量较高' : 'High usage',
+                    color: 'text-yellow-600 dark:text-yellow-400'
+                };
+            } else {
+                return {
+                    text: this.currentLanguage === 'zh' ? '使用量很高' : 'Very high usage',
+                    color: 'text-red-600 dark:text-red-400'
+                };
             }
         },
         
