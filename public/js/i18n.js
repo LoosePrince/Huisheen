@@ -103,17 +103,70 @@ const i18n = {
             // 使用场景
             scenarios: {
                 title: '适用场景',
+                modes: {
+                    active: {
+                        name: '主动模式',
+                        description: '实时推送，即时响应'
+                    },
+                    passive: {
+                        name: '被动模式', 
+                        description: '定期轮询，公开透明'
+                    },
+                    hybrid: {
+                        name: '混合模式',
+                        description: '双模并用，灵活高效'
+                    }
+                },
+                // 主动模式示例（可以有部分非重要隐私）
                 system: {
                     title: '系统监控',
-                    desc: '服务器状态、应用健康度、性能指标等系统通知'
+                    desc: '服务器状态、应用健康度、性能指标等系统运维通知',
+                    mode: 'active',
+                    icon: 'fas fa-server'
                 },
                 business: {
-                    title: '业务通知',
-                    desc: '订单状态、支付通知、用户行为等业务消息'
+                    title: '运营数据',
+                    desc: '网站访问统计、功能使用情况、用户增长等运营指标通知',
+                    mode: 'active',
+                    icon: 'fas fa-chart-line'
                 },
-                development: {
-                    title: '开发协作',
-                    desc: 'CI/CD状态、代码审查、部署结果等开发通知'
+                security: {
+                    title: '安全警报',
+                    desc: '登录异常、权限变更、安全事件等实时安全通知',
+                    mode: 'active',
+                    icon: 'fas fa-shield-alt'
+                },
+                // 被动模式示例（完全公开）
+                content: {
+                    title: '内容发布',
+                    desc: '博客更新、新闻发布、活动通知等公开内容推送',
+                    mode: 'passive',
+                    icon: 'fas fa-newspaper'
+                },
+                opensource: {
+                    title: '开源项目',
+                    desc: '代码提交、版本发布、问题追踪等开源项目动态',
+                    mode: 'passive',
+                    icon: 'fab fa-github'
+                },
+                announcement: {
+                    title: '公告通知',
+                    desc: '维护公告、功能更新、服务状态等官方公开通知',
+                    mode: 'passive',
+                    icon: 'fas fa-bullhorn'
+                },
+                // 二合一模式示例
+                community: {
+                    title: '社区平台',
+                    desc: '用户互动实时推送 + 定期获取热门内容和话题动态',
+                    mode: 'hybrid',
+                    icon: 'fas fa-users'
+                },
+                project: {
+                    title: '项目管理',
+                    desc: '任务分配即时通知 + 定期获取进度报告和团队动态',
+                    mode: 'hybrid',
+                    icon: 'fas fa-project-diagram'
                 }
             },
             
@@ -461,17 +514,70 @@ const i18n = {
             // Use cases
             scenarios: {
                 title: 'Use Cases',
+                modes: {
+                    active: {
+                        name: 'Active Mode',
+                        description: 'Real-time push, instant response'
+                    },
+                    passive: {
+                        name: 'Passive Mode', 
+                        description: 'Scheduled polling, open and transparent'
+                    },
+                    hybrid: {
+                        name: 'Hybrid Mode',
+                        description: 'Dual mode, flexible and efficient'
+                    }
+                },
+                // 主动模式示例（可以有部分非重要隐私）
                 system: {
                     title: 'System Monitoring',
-                    desc: 'Server status, application health, performance metrics and other system notifications'
+                    desc: 'System operation and maintenance notifications such as server status, application health, performance indicators',
+                    mode: 'active',
+                    icon: 'fas fa-server'
                 },
                 business: {
-                    title: 'Business Notifications',
-                    desc: 'Order status, payment notifications, user behavior and other business messages'
+                    title: 'Operational Data',
+                    desc: 'Website traffic statistics, feature usage, user growth and other operational metrics notifications',
+                    mode: 'active',
+                    icon: 'fas fa-chart-line'
                 },
-                development: {
-                    title: 'Development Collaboration',
-                    desc: 'CI/CD status, code reviews, deployment results and other development notifications'
+                security: {
+                    title: 'Security Alerts',
+                    desc: 'Real-time security notifications such as login exceptions, permission changes, security events',
+                    mode: 'active',
+                    icon: 'fas fa-shield-alt'
+                },
+                // 被动模式示例（完全公开）
+                content: {
+                    title: 'Content Publishing',
+                    desc: 'Public content notifications such as blog updates, news releases, event notifications',
+                    mode: 'passive',
+                    icon: 'fas fa-newspaper'
+                },
+                opensource: {
+                    title: 'Open Source Project',
+                    desc: 'Open source project notifications such as code commits, version releases, problem tracking',
+                    mode: 'passive',
+                    icon: 'fab fa-github'
+                },
+                announcement: {
+                    title: 'Announcement Notifications',
+                    desc: 'Official public notifications such as maintenance announcements, feature updates, service status',
+                    mode: 'passive',
+                    icon: 'fas fa-bullhorn'
+                },
+                // 二合一模式示例
+                community: {
+                    title: 'Community Platform',
+                    desc: 'Real-time user interaction push + periodic access to popular content and topic dynamics',
+                    mode: 'hybrid',
+                    icon: 'fas fa-users'
+                },
+                project: {
+                    title: 'Project Management',
+                    desc: 'Instant task assignment notification + periodic access to progress reports and team dynamics',
+                    mode: 'hybrid',
+                    icon: 'fas fa-project-diagram'
                 }
             },
             

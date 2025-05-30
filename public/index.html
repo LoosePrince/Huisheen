@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ currentLanguage === 'zh' ? '回声 (Huisheen) - 通知接收平台' : 'Huisheen (Echo) - Notification Platform' }}</title>
+    <title>回声 (Huisheen) - 通知接收平台 (Notification Platform)</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.ico">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
@@ -510,27 +510,90 @@
                     <h2 class="text-2xl sm:text-3xl font-bold text-center text-gray-900 dark:text-white mb-8">
                         <i class="fas fa-lightbulb text-yellow-500 mr-3"></i>{{ t.home.scenarios.title }}
                     </h2>
-                    <div class="grid md:grid-cols-3 gap-6">
-                        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border dark:border-gray-700">
-                            <div class="text-center mb-4">
-                                <i class="fas fa-server text-3xl text-blue-600 dark:text-blue-400"></i>
+                    
+                    <!-- 主动模式场景 -->
+                    <div class="mb-8">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4 text-center">
+                            <span class="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 px-3 py-1 rounded-full text-sm mr-2">{{ t.home.scenarios.modes.active.name }}</span>
+                            {{ t.home.scenarios.modes.active.description }}
+                        </h3>
+                        <div class="grid md:grid-cols-3 gap-6">
+                            <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border dark:border-gray-700">
+                                <div class="text-center mb-4">
+                                    <i :class="t.home.scenarios.system.icon" class="text-3xl text-blue-600 dark:text-blue-400"></i>
+                                </div>
+                                <h4 class="font-semibold text-gray-900 dark:text-white mb-2 text-center">{{ t.home.scenarios.system.title }}</h4>
+                                <p class="text-sm text-gray-600 dark:text-gray-300 text-center">{{ t.home.scenarios.system.desc }}</p>
                             </div>
-                            <h4 class="font-semibold text-gray-900 dark:text-white mb-2 text-center">{{ t.home.scenarios.system.title }}</h4>
-                            <p class="text-sm text-gray-600 dark:text-gray-300 text-center">{{ t.home.scenarios.system.desc }}</p>
+                            <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border dark:border-gray-700">
+                                <div class="text-center mb-4">
+                                    <i :class="t.home.scenarios.business.icon" class="text-3xl text-green-600 dark:text-green-400"></i>
+                                </div>
+                                <h4 class="font-semibold text-gray-900 dark:text-white mb-2 text-center">{{ t.home.scenarios.business.title }}</h4>
+                                <p class="text-sm text-gray-600 dark:text-gray-300 text-center">{{ t.home.scenarios.business.desc }}</p>
+                            </div>
+                            <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border dark:border-gray-700">
+                                <div class="text-center mb-4">
+                                    <i :class="t.home.scenarios.security.icon" class="text-3xl text-red-600 dark:text-red-400"></i>
+                                </div>
+                                <h4 class="font-semibold text-gray-900 dark:text-white mb-2 text-center">{{ t.home.scenarios.security.title }}</h4>
+                                <p class="text-sm text-gray-600 dark:text-gray-300 text-center">{{ t.home.scenarios.security.desc }}</p>
+                            </div>
                         </div>
-                        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border dark:border-gray-700">
-                            <div class="text-center mb-4">
-                                <i class="fas fa-shopping-cart text-3xl text-green-600 dark:text-green-400"></i>
+                    </div>
+                    
+                    <!-- 被动模式场景 -->
+                    <div class="mb-8">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4 text-center">
+                            <span class="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 px-3 py-1 rounded-full text-sm mr-2">{{ t.home.scenarios.modes.passive.name }}</span>
+                            {{ t.home.scenarios.modes.passive.description }}
+                        </h3>
+                        <div class="grid md:grid-cols-3 gap-6">
+                            <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border dark:border-gray-700">
+                                <div class="text-center mb-4">
+                                    <i :class="t.home.scenarios.content.icon" class="text-3xl text-orange-600 dark:text-orange-400"></i>
+                                </div>
+                                <h4 class="font-semibold text-gray-900 dark:text-white mb-2 text-center">{{ t.home.scenarios.content.title }}</h4>
+                                <p class="text-sm text-gray-600 dark:text-gray-300 text-center">{{ t.home.scenarios.content.desc }}</p>
                             </div>
-                            <h4 class="font-semibold text-gray-900 dark:text-white mb-2 text-center">{{ t.home.scenarios.business.title }}</h4>
-                            <p class="text-sm text-gray-600 dark:text-gray-300 text-center">{{ t.home.scenarios.business.desc }}</p>
+                            <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border dark:border-gray-700">
+                                <div class="text-center mb-4">
+                                    <i :class="t.home.scenarios.opensource.icon" class="text-3xl text-gray-600 dark:text-gray-400"></i>
+                                </div>
+                                <h4 class="font-semibold text-gray-900 dark:text-white mb-2 text-center">{{ t.home.scenarios.opensource.title }}</h4>
+                                <p class="text-sm text-gray-600 dark:text-gray-300 text-center">{{ t.home.scenarios.opensource.desc }}</p>
+                            </div>
+                            <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border dark:border-gray-700">
+                                <div class="text-center mb-4">
+                                    <i :class="t.home.scenarios.announcement.icon" class="text-3xl text-indigo-600 dark:text-indigo-400"></i>
+                                </div>
+                                <h4 class="font-semibold text-gray-900 dark:text-white mb-2 text-center">{{ t.home.scenarios.announcement.title }}</h4>
+                                <p class="text-sm text-gray-600 dark:text-gray-300 text-center">{{ t.home.scenarios.announcement.desc }}</p>
+                            </div>
                         </div>
-                        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border dark:border-gray-700">
-                            <div class="text-center mb-4">
-                                <i class="fas fa-code-branch text-3xl text-purple-600 dark:text-purple-400"></i>
+                    </div>
+                    
+                    <!-- 混合模式场景 -->
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4 text-center">
+                            <span class="bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 px-3 py-1 rounded-full text-sm mr-2">{{ t.home.scenarios.modes.hybrid.name }}</span>
+                            {{ t.home.scenarios.modes.hybrid.description }}
+                        </h3>
+                        <div class="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+                            <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border dark:border-gray-700">
+                                <div class="text-center mb-4">
+                                    <i :class="t.home.scenarios.community.icon" class="text-3xl text-purple-600 dark:text-purple-400"></i>
+                                </div>
+                                <h4 class="font-semibold text-gray-900 dark:text-white mb-2 text-center">{{ t.home.scenarios.community.title }}</h4>
+                                <p class="text-sm text-gray-600 dark:text-gray-300 text-center">{{ t.home.scenarios.community.desc }}</p>
                             </div>
-                            <h4 class="font-semibold text-gray-900 dark:text-white mb-2 text-center">{{ t.home.scenarios.development.title }}</h4>
-                            <p class="text-sm text-gray-600 dark:text-gray-300 text-center">{{ t.home.scenarios.development.desc }}</p>
+                            <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border dark:border-gray-700">
+                                <div class="text-center mb-4">
+                                    <i :class="t.home.scenarios.project.icon" class="text-3xl text-teal-600 dark:text-teal-400"></i>
+                                </div>
+                                <h4 class="font-semibold text-gray-900 dark:text-white mb-2 text-center">{{ t.home.scenarios.project.title }}</h4>
+                                <p class="text-sm text-gray-600 dark:text-gray-300 text-center">{{ t.home.scenarios.project.desc }}</p>
+                            </div>
                         </div>
                     </div>
                 </div>

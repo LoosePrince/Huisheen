@@ -112,12 +112,6 @@ Content-Type: application/json
 - **Axios** - HTTP客户端
 - **Font Awesome** - 图标库
 
-### 开发工具
-
-- **Nodemon** - 开发时自动重启
-- **Jest** - 单元测试框架
-- **ESLint** - 代码质量检查
-
 ## 🚀 快速开始
 
 ### 前置要求
