@@ -282,17 +282,28 @@ Content-Type: application/json
 | `metadata` | object | ❌ | 额外元数据 (键值对，最多10个键) |
 | `image_url` | string | ❌ | 通知附带图片URL (必须是有效的图片URL) |
 
-**服务信息接口** - **GET** `/api/service-info` (可选)
+
+作为回声生态系统的服务提供者，您可以创建自己的服务供其他用户订阅。提供服务不仅能帮助用户获取重要通知，还能为您的账户获取额外的存储空间奖励。
+
+要成为服务提供者，您需要实现标准的通知API接口，并确保您的服务能够被回声平台正确识别。
+
+您的服务必须提供一个服务信息接口，以便回声平台能够识别和展示您的服务：
+
+**服务信息接口** - **GET** `/api/service-info` 
+
 ```json
 {
   "name": "我的服务",
-  "description": "服务描述",
+  "description": "服务描述内容",
   "version": "1.0.0",
-  "provider": "My Company",
+  "provider": "服务提供商名称",
   "polling_interval": 5,
-  "api_endpoint": "https://myservice.com/api/notifications"
+  "api_endpoint": "https://myservice.com/api/notifications",
+  "icon_url": "https://myservice.com/icon.png",
+  "owner_notify_id": "1234-5678-9abc"
 }
 ```
+
 
 **响应参数说明**:
 
@@ -305,6 +316,10 @@ Content-Type: application/json
 | `polling_interval` | number | ❌ | 建议的轮询间隔（分钟） |
 | `api_endpoint` | string | ✅ | 通知数据获取接口完整URL |
 | `icon_url` | string | ❌ | 服务图标URL |
+| `owner_notify_id` | string | ❌ | 服务所有者的通知ID，用于识别服务归属 |
+
+**注意**: 添加`owner_notify_id`参数可让回声平台识别您是此服务的所有者，从而在您的账户中显示服务信息并增加存储空间奖励。
+
 
 ##### 手动触发轮询
 
