@@ -234,7 +234,63 @@ userSchema.methods.getStorageUsage = async function() {
     });
     
     const totalSize = notificationsSize + subscriptionsSize;
-    const maxSize = 1024 * 1024; // 1MB
+    
+    // 基础存储上限（默认1MB）
+    let baseSize = 1024 * 1024; // 1MB
+    
+    // 额外存储奖励计算
+    let extraSize = 0;
+    let extraSizeInfo = [];
+    
+    // 1. 验证邮箱奖励：增加1MB存储空间
+    if (this.isEmailVerified) {
+      extraSize += 1024 * 1024; // +1MB
+      extraSizeInfo.push({
+        reason: 'email_verified',
+        size: 1024 * 1024,
+        description: '邮箱验证奖励'
+      });
+      
+      // 2. 提供服务奖励：如果已验证邮箱，每提供一个服务增加5MB，最多计算两个
+      if (this.isEmailVerified) {
+        // 获取当前用户的通知ID
+        const userNotifyId = this.notifyId;
+        
+        // 计算用户提供的服务数量
+        const myServices = [];
+        for (const sub of subscriptions) {
+          // 获取服务配置中的owner_notify_id
+          const ownerNotifyId = sub.config?.serviceInfo?.owner_notify_id;
+          
+          // 如果当前用户是服务所有者，则计入统计
+          if (ownerNotifyId && ownerNotifyId === userNotifyId) {
+            const serviceKey = sub.serviceHost;
+            
+            // 如果这个服务还没有被计算过，添加到服务列表
+            if (!myServices.includes(serviceKey)) {
+              myServices.push(serviceKey);
+            }
+          }
+        }
+        
+        // 计算服务提供的额外存储空间（最多两个服务）
+        const serviceCount = Math.min(myServices.length, 2);
+        if (serviceCount > 0) {
+          const serviceExtraSize = serviceCount * 5 * 1024 * 1024; // 每个服务+5MB
+          extraSize += serviceExtraSize;
+          extraSizeInfo.push({
+            reason: 'service_provider',
+            size: serviceExtraSize,
+            count: serviceCount,
+            services: myServices.slice(0, 2), // 最多显示两个服务
+            description: `提供服务奖励 (${serviceCount}个服务)`
+          });
+        }
+      }
+    }
+    
+    // 总存储上限 = 基础 + 额外奖励
+    const maxSize = baseSize + extraSize;
     const usagePercentage = Math.min((totalSize / maxSize) * 100, 100);
     
     return {
@@ -248,6 +304,9 @@ userSchema.methods.getStorageUsage = async function() {
       },
       total: {
         size: totalSize,
+        baseSize: baseSize,
+        extraSize: extraSize,
+        extraSizeInfo: extraSizeInfo,
         maxSize: maxSize,
         usagePercentage: usagePercentage,
         remainingSize: Math.max(maxSize - totalSize, 0)
@@ -258,7 +317,15 @@ userSchema.methods.getStorageUsage = async function() {
     return {
       notifications: { count: 0, size: 0 },
       subscriptions: { count: 0, size: 0 },
-      total: { size: 0, maxSize: 1024 * 1024, usagePercentage: 0, remainingSize: 1024 * 1024 }
+      total: { 
+        size: 0, 
+        baseSize: 1024 * 1024, 
+        extraSize: 0,
+        extraSizeInfo: [],
+        maxSize: 1024 * 1024, 
+        usagePercentage: 0, 
+        remainingSize: 1024 * 1024 
+      }
     };
   }
 };

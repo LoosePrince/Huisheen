@@ -1145,7 +1145,7 @@
                             </div>
                         </div>
 
-                        <!-- 邮箱验证 -->
+                        <!-- 邮箱验证相关 -->
                         <div v-if="user" class="mt-6">
                             <h3 class="text-lg font-medium mb-4 text-gray-900 dark:text-white">{{ t.user.settings.emailVerification }}</h3>
                             <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg theme-transition">
@@ -1201,6 +1201,31 @@
                                             {{ formatRemainingTime(emailVerification.remainingTime) }}
                                         </div>
                                     </div>
+                                    
+                                    <!-- 邮箱已验证 - 显示信息图标按钮 -->
+                                    <div v-else class="relative">
+                                        <button class="w-8 h-8 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-full flex items-center justify-center hover:bg-green-200 dark:hover:bg-green-800 transition group" 
+                                                @mouseenter="showEmailVerifiedTooltip = true"
+                                                @mouseleave="showEmailVerifiedTooltip = false">
+                                            <i class="fas fa-info text-sm"></i>
+                                        </button>
+                                        
+                                        <!-- 自定义悬停提示框 -->
+                                        <div v-show="showEmailVerifiedTooltip" 
+                                             class="absolute right-0 mt-2 w-64 z-50 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 p-4 rounded-lg shadow-lg">
+                                            <div class="flex items-start">
+                                                <i class="fas fa-check-circle text-green-500 mt-0.5 mr-2 flex-shrink-0 text-lg"></i>
+                                                <div>
+                                                    <h4 class="text-sm font-medium text-green-800 dark:text-green-200">
+                                                        {{ t.user.settings.verificationSuccess }}
+                                                    </h4>
+                                                    <p class="text-xs text-green-600 dark:text-green-400 mt-1">
+                                                        {{ t.user.settings.verificationSuccessDesc }}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 
                                 <!-- 验证码输入 -->
@@ -1233,23 +1258,6 @@
                                         </p>
                                     </div>
                                 </div>
-                                
-                                <!-- 已验证状态 -->
-                                <div v-if="user.isEmailVerified" class="mt-4">
-                                    <div class="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 p-4 rounded-lg">
-                                        <div class="flex items-center">
-                                            <i class="fas fa-check-circle text-green-500 mr-3 text-xl"></i>
-                                            <div>
-                                                <h4 class="text-sm font-medium text-green-800 dark:text-green-200">
-                                                    {{ t.user.settings.verificationSuccess }}
-                                                </h4>
-                                                <p class="text-xs text-green-600 dark:text-green-400 mt-1">
-                                                    {{ t.user.settings.verificationSuccessDesc }}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
                             </div>
                         </div>
 
@@ -1279,9 +1287,16 @@
                                               :class="getStorageUsageLevel(user.storageUsage.total.usagePercentage).color">
                                             {{ getStorageUsageLevel(user.storageUsage.total.usagePercentage).text }}
                                         </span>
-                                        <span class="text-xs text-gray-500 dark:text-gray-400">
-                                            {{ t.user.settings.remaining }}: {{ formatSize(user.storageUsage.total.remainingSize) }}
-                                        </span>
+                                        <div class="flex items-center space-x-2">
+                                            <span class="text-xs text-gray-500 dark:text-gray-400">
+                                                {{ t.user.settings.remaining }}: {{ formatSize(user.storageUsage.total.remainingSize) }}
+                                            </span>
+                                            <button @click="showStorageLimitInfo = true" 
+                                                    class="w-5 h-5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center hover:bg-blue-200 dark:hover:bg-blue-800 transition" 
+                                                    :title="t.user.settings.storageLimit">
+                                                <i class="fas fa-info text-xs"></i>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -1333,18 +1348,7 @@
                                     </div>
                                 </div>
 
-                                <!-- 存储限制说明 -->
-                                <div class="mt-4 p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg">
-                                    <div class="flex items-start">
-                                        <i class="fas fa-info-circle text-blue-500 mt-0.5 mr-2 flex-shrink-0"></i>
-                                        <div class="text-sm text-blue-700 dark:text-blue-300">
-                                            <strong>{{ t.user.settings.storageLimit }}</strong>
-                                            <p class="mt-1 text-xs">
-                                                {{ currentLanguage === 'zh' ? '当前为测试阶段，暂不限制存储使用超出情况。正式版本将提供更大的存储空间和管理功能。' : 'Currently in beta phase, no storage limit enforcement. Official version will provide larger storage space and management features.' }}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
+                                <!-- 存储限制说明 - 删除这部分，改为弹窗显示 -->
                             </div>
                         </div>
 
@@ -1829,6 +1833,99 @@
                 </transition>
         </div>
         </transition>
+
+        <!-- 存储限制说明弹窗 -->
+        <transition name="modal">
+            <div v-if="showStorageLimitInfo" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" @click="showStorageLimitInfo = false">
+                <transition name="modal-content">
+                    <div v-if="showStorageLimitInfo" class="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4 theme-transition" @click.stop>
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-medium text-gray-900 dark:text-white">{{ t.user.settings.storageLimit }}</h3>
+                            <button @click="showStorageLimitInfo = false" class="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        
+                        <!-- 弹窗内容 -->
+                        <div class="space-y-4">
+                            <!-- 基础存储信息 -->
+                            <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                                <span class="text-gray-700 dark:text-gray-300">{{ t.user.settings.baseStorageLimit }}:</span>
+                                <span class="font-medium text-gray-900 dark:text-white">{{ formatSize(user.storageUsage.total.baseSize) }}</span>
+                            </div>
+                            
+                            <!-- 额外存储信息 -->
+                            <div v-if="user.storageUsage.total.extraSize > 0" class="space-y-2">
+                                <div v-for="(info, index) in user.storageUsage.total.extraSizeInfo" :key="index" 
+                                     class="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/30 rounded-lg">
+                                    <span class="text-gray-700 dark:text-gray-300 flex items-center">
+                                        <i v-if="info.reason === 'email_verified'" class="fas fa-envelope-open-text mr-2 text-green-500"></i>
+                                        <i v-else-if="info.reason === 'service_provider'" class="fas fa-server mr-2 text-green-500"></i>
+                                        <span v-if="info.reason === 'email_verified'">
+                                            {{ t.user.settings.emailVerifiedBonus }}:
+                                        </span>
+                                        <span v-else-if="info.reason === 'service_provider' && info.count">
+                                            {{ getText('user.settings.serviceProviderBonusWithCount', {count: info.count}) }}:
+                                        </span>
+                                        <span v-else>
+                                            {{ info.description }}:
+                                        </span>
+                                    </span>
+                                    <span class="font-medium text-green-600 dark:text-green-400">+{{ formatSize(info.size) }}</span>
+                                </div>
+                                
+                                <!-- 总计额外存储 -->
+                                <div class="flex justify-between items-center p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg font-medium">
+                                    <span class="text-gray-700 dark:text-gray-300">{{ t.user.settings.extraStorageTotal }}:</span>
+                                    <span class="text-green-600 dark:text-green-400">+{{ formatSize(user.storageUsage.total.extraSize) }}</span>
+                                </div>
+                            </div>
+                            
+                            <!-- 总计存储上限 -->
+                            <div class="flex justify-between items-center p-3 bg-blue-100 dark:bg-blue-900/40 rounded-lg font-bold">
+                                <span class="text-gray-800 dark:text-gray-200">{{ t.user.settings.totalStorageLimit }}:</span>
+                                <span class="text-blue-600 dark:text-blue-400">{{ formatSize(user.storageUsage.total.maxSize) }}</span>
+                            </div>
+                            
+                            <!-- 提示信息 -->
+                            <div class="space-y-3 mt-3">
+                                <!-- 验证邮箱提示 -->
+                                <div v-if="!user.isEmailVerified" class="p-3 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 rounded-lg text-sm">
+                                    <div class="flex items-start">
+                                        <i class="fas fa-exclamation-triangle text-yellow-500 mt-0.5 mr-2 flex-shrink-0"></i>
+                                        <span class="text-yellow-700 dark:text-yellow-300">{{ t.user.settings.verifyEmailForStorage }}</span>
+                                    </div>
+                                </div>
+                                
+                                <!-- 提供服务提示 -->
+                                <div v-else-if="user.isEmailVerified && (!user.storageUsage.total.extraSizeInfo[1] || user.storageUsage.total.extraSizeInfo[1]?.count < 2)" class="p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg text-sm">
+                                    <div class="flex items-start">
+                                        <i class="fas fa-lightbulb text-blue-500 mt-0.5 mr-2 flex-shrink-0"></i>
+                                        <span class="text-blue-700 dark:text-blue-300">{{ t.user.settings.provideServiceForStorage }}</span>
+                                    </div>
+                                </div>
+                                
+                                <!-- 测试阶段提示 -->
+                                <div class="p-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm">
+                                    <div class="flex items-start">
+                                        <i class="fas fa-info-circle text-gray-500 mt-0.5 mr-2 flex-shrink-0"></i>
+                                        <span class="text-gray-600 dark:text-gray-400">
+                                            {{ t.user.settings.betaStorageNotice }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </transition>
+            </div>
+        </transition>
+
+        <!-- 返回顶部按钮 -->
+        <button v-if="showBackToTop" @click="scrollToTop" 
+                class="fixed bottom-8 right-8 bg-blue-500 text-white w-12 h-12 rounded-full shadow-lg hover:bg-blue-600 transition transform hover:scale-110 z-40">
+            <i class="fas fa-arrow-up"></i>
+        </button>
     </div>
 
     <script src="/js/i18n.js"></script>

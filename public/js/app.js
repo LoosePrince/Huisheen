@@ -63,6 +63,10 @@ createApp({
             showNotificationModal: false,
             selectedNotification: null,
             
+            // 存储限制信息弹窗状态
+            showStorageLimitInfo: false,
+            showEmailVerifiedTooltip: false,
+            
             // 分页和筛选
             filters: {
                 type: '',
@@ -321,9 +325,23 @@ createApp({
                 
                 // 替换参数
                 if (typeof text === 'string' && Object.keys(params).length > 0) {
-                    return text.replace(/\{(\w+)\}/g, (match, paramKey) => {
+                    let result = text.replace(/\{(\w+)\}/g, (match, paramKey) => {
                         return params[paramKey] !== undefined ? params[paramKey] : match;
                     });
+                    
+                    // 特殊处理英文环境下的单复数形式
+                    if (this.currentLanguage === 'en' && params.count !== undefined) {
+                        if (key === 'user.settings.serviceProviderBonusWithCount') {
+                            // 根据count决定单复数形式
+                            if (parseInt(params.count) === 1) {
+                                result = result.replace('service)', 'service)');
+                            } else {
+                                result = result.replace('service)', 'services)');
+                            }
+                        }
+                    }
+                    
+                    return result;
                 }
                 
                 return text;
@@ -796,6 +814,12 @@ createApp({
                 // 更新用户信息
                 if (this.user) {
                     this.user.isEmailVerified = response.data.isEmailVerified;
+                    
+                    // 重新加载用户信息，获取更新后的存储使用情况
+                    await this.loadUserInfo();
+                    
+                    // 如果用户已经有服务，也刷新我的服务列表，因为可能会影响存储上限
+                    await this.fetchMyServices();
                 }
                 
                 // 重置验证状态
