@@ -6,6 +6,7 @@ const auth = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
 const config = require('../config/config');
 const emailService = require('../services/emailService');
+const { ERROR_CODES, createErrorResponse } = require('../utils/errorHandler');
 
 const router = express.Router();
 
@@ -25,7 +26,14 @@ router.post('/register', [
     });
 
     if (existingUser) {
-      return res.status(400).json({ error: '用户名或邮箱已存在' });
+      return res.status(400).json(
+        createErrorResponse(
+          '用户名或邮箱已存在', 
+          ERROR_CODES.RESOURCE_ALREADY_EXISTS,
+          null,
+          req.originalUrl
+        )
+      );
     }
 
     // 创建新用户
@@ -52,7 +60,14 @@ router.post('/register', [
     });
   } catch (error) {
     console.error('注册错误:', error);
-    res.status(500).json({ error: '服务器内部错误' });
+    res.status(500).json(
+      createErrorResponse(
+        '服务器内部错误', 
+        ERROR_CODES.INTERNAL_ERROR,
+        null,
+        req.originalUrl
+      )
+    );
   }
 });
 
@@ -68,17 +83,50 @@ router.post('/login', [
     // 查找用户
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(401).json({ error: '邮箱或密码错误' });
+      return res.status(401).json(
+        createErrorResponse(
+          '邮箱或密码错误', 
+          ERROR_CODES.INVALID_CREDENTIALS,
+          null,
+          req.originalUrl
+        )
+      );
     }
 
     // 验证密码
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-      return res.status(401).json({ error: '邮箱或密码错误' });
+      return res.status(401).json(
+        createErrorResponse(
+          '邮箱或密码错误', 
+          ERROR_CODES.INVALID_CREDENTIALS,
+          null,
+          req.originalUrl
+        )
+      );
     }
 
     if (!user.isActive) {
-      return res.status(401).json({ error: '账户已被禁用' });
+      return res.status(401).json(
+        createErrorResponse(
+          '账户已被禁用', 
+          ERROR_CODES.ACCOUNT_DISABLED,
+          null,
+          req.originalUrl
+        )
+      );
+    }
+
+    // 检查邮箱是否已验证 (如果系统要求邮箱验证)
+    if (config.requireEmailVerification && !user.isEmailVerified) {
+      return res.status(403).json(
+        createErrorResponse(
+          '邮箱未验证，请先验证邮箱', 
+          ERROR_CODES.EMAIL_NOT_VERIFIED,
+          null,
+          req.originalUrl
+        )
+      );
     }
 
     // 检查并设置管理员权限（如果配置了管理员邮箱）
@@ -112,7 +160,14 @@ router.post('/login', [
     });
   } catch (error) {
     console.error('登录错误:', error);
-    res.status(500).json({ error: '服务器内部错误' });
+    res.status(500).json(
+      createErrorResponse(
+        '服务器内部错误', 
+        ERROR_CODES.INTERNAL_ERROR,
+        null,
+        req.originalUrl
+      )
+    );
   }
 });
 
@@ -137,7 +192,14 @@ router.get('/me', auth, async (req, res) => {
     });
   } catch (error) {
     console.error('获取用户信息错误:', error);
-    res.status(500).json({ error: '服务器内部错误' });
+    res.status(500).json(
+      createErrorResponse(
+        '服务器内部错误', 
+        ERROR_CODES.INTERNAL_ERROR,
+        null,
+        req.originalUrl
+      )
+    );
   }
 });
 
@@ -155,7 +217,14 @@ router.post('/generate-notify-code', auth, async (req, res) => {
     });
   } catch (error) {
     console.error('生成通知标识码错误:', error);
-    res.status(500).json({ error: '服务器内部错误' });
+    res.status(500).json(
+      createErrorResponse(
+        '服务器内部错误', 
+        ERROR_CODES.INTERNAL_ERROR,
+        null,
+        req.originalUrl
+      )
+    );
   }
 });
 
@@ -166,22 +235,39 @@ router.post('/send-email-verification', auth, async (req, res) => {
     
     // 检查邮件服务是否可用
     if (!emailService.isAvailable()) {
-      return res.status(503).json({ 
-        error: '邮件服务暂时不可用，请稍后重试或联系管理员配置邮件服务' 
-      });
+      return res.status(503).json(
+        createErrorResponse(
+          '邮件服务暂时不可用，请稍后重试或联系管理员配置邮件服务', 
+          ERROR_CODES.SERVICE_UNAVAILABLE,
+          null,
+          req.originalUrl
+        )
+      );
     }
     
     // 检查是否已经验证
     if (user.isEmailVerified) {
-      return res.status(400).json({ error: '邮箱已经验证过了' });
+      return res.status(400).json(
+        createErrorResponse(
+          '邮箱已经验证过了', 
+          ERROR_CODES.OPERATION_NOT_ALLOWED,
+          null,
+          req.originalUrl
+        )
+      );
     }
     
     // 检查发送频率限制（5分钟内只能发送一次）
     if (user.emailVerificationExpires && user.emailVerificationExpires > new Date()) {
       const remainingTime = Math.ceil((user.emailVerificationExpires - new Date()) / 1000 / 60);
-      return res.status(429).json({ 
-        error: `请等待 ${remainingTime} 分钟后再重新发送验证码` 
-      });
+      return res.status(429).json(
+        createErrorResponse(
+          `请等待 ${remainingTime} 分钟后再重新发送验证码`, 
+          ERROR_CODES.NOTIFICATION_THROTTLED,
+          { remainingTime },
+          req.originalUrl
+        )
+      );
     }
     
     // 生成验证码
@@ -197,7 +283,14 @@ router.post('/send-email-verification', auth, async (req, res) => {
     });
   } catch (error) {
     console.error('发送邮箱验证码错误:', error);
-    res.status(500).json({ error: error.message || '发送验证码失败' });
+    res.status(500).json(
+      createErrorResponse(
+        error.message || '发送验证码失败', 
+        ERROR_CODES.INTERNAL_ERROR,
+        null,
+        req.originalUrl
+      )
+    );
   }
 });
 
@@ -214,7 +307,44 @@ router.post('/verify-email', [
     const result = user.verifyEmailCode(code);
     
     if (!result.success) {
-      return res.status(400).json({ error: result.message });
+      // 根据不同的验证失败原因返回不同的错误代码
+      if (result.message.includes('验证码已过期')) {
+        return res.status(400).json(
+          createErrorResponse(
+            result.message, 
+            ERROR_CODES.RESOURCE_EXPIRED,
+            null,
+            req.originalUrl
+          )
+        );
+      } else if (result.message.includes('验证码不存在')) {
+        return res.status(400).json(
+          createErrorResponse(
+            result.message, 
+            ERROR_CODES.RESOURCE_NOT_FOUND,
+            null,
+            req.originalUrl
+          )
+        );
+      } else if (result.message.includes('验证尝试次数过多')) {
+        return res.status(400).json(
+          createErrorResponse(
+            result.message, 
+            ERROR_CODES.RATE_LIMIT_EXCEEDED,
+            null,
+            req.originalUrl
+          )
+        );
+      } else {
+        return res.status(400).json(
+          createErrorResponse(
+            result.message, 
+            ERROR_CODES.VALIDATION_FAILED,
+            null,
+            req.originalUrl
+          )
+        );
+      }
     }
     
     // 保存验证结果
@@ -226,7 +356,14 @@ router.post('/verify-email', [
     });
   } catch (error) {
     console.error('验证邮箱验证码错误:', error);
-    res.status(500).json({ error: '服务器内部错误' });
+    res.status(500).json(
+      createErrorResponse(
+        '服务器内部错误', 
+        ERROR_CODES.INTERNAL_ERROR,
+        null,
+        req.originalUrl
+      )
+    );
   }
 });
 
@@ -237,7 +374,14 @@ router.get('/email-service-status', auth, async (req, res) => {
     res.json(status);
   } catch (error) {
     console.error('获取邮件服务状态错误:', error);
-    res.status(500).json({ error: '服务器内部错误' });
+    res.status(500).json(
+      createErrorResponse(
+        '服务器内部错误', 
+        ERROR_CODES.INTERNAL_ERROR,
+        null,
+        req.originalUrl
+      )
+    );
   }
 });
 

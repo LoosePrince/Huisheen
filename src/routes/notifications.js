@@ -5,6 +5,7 @@ const Subscription = require('../models/Subscription');
 const User = require('../models/User');
 const auth = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
+const { ERROR_CODES, createErrorResponse } = require('../utils/errorHandler');
 
 const router = express.Router();
 
@@ -25,19 +26,51 @@ router.post('/receive', [
     // 验证token
     const decodedToken = Subscription.verifyToken(token);
     if (!decodedToken) {
-      return res.status(401).json({ error: '无效的Token' });
+      return res.status(401).json(
+        createErrorResponse(
+          '无效的Token', 
+          ERROR_CODES.PUSH_TOKEN_INVALID,
+          null,
+          req.originalUrl
+        )
+      );
     }
 
     // 查找订阅
     const subscription = await Subscription.findById(decodedToken.subscriptionId);
-    if (!subscription || !subscription.isActive) {
-      return res.status(404).json({ error: '订阅不存在或已禁用' });
+    if (!subscription) {
+      return res.status(404).json(
+        createErrorResponse(
+          '订阅不存在', 
+          ERROR_CODES.SUBSCRIPTION_NOT_FOUND,
+          null,
+          req.originalUrl
+        )
+      );
+    }
+    
+    if (!subscription.isActive) {
+      return res.status(403).json(
+        createErrorResponse(
+          '订阅已禁用', 
+          ERROR_CODES.SUBSCRIPTION_ERROR,
+          { reason: 'disabled' },
+          req.originalUrl
+        )
+      );
     }
 
     // 验证用户和通知ID匹配
     const user = await User.findById(subscription.userId);
     if (!user || user.notifyId !== notifyId) {
-      return res.status(401).json({ error: '通知ID与Token不匹配' });
+      return res.status(401).json(
+        createErrorResponse(
+          '通知ID与Token不匹配', 
+          ERROR_CODES.PERMISSION_DENIED,
+          null,
+          req.originalUrl
+        )
+      );
     }
 
     // 检查是否重复通知 (如果提供了externalId)
@@ -50,9 +83,31 @@ router.post('/receive', [
       if (existingNotification) {
         return res.status(200).json({ 
           message: '通知已存在',
-          notificationId: existingNotification._id 
+          notificationId: existingNotification._id,
+          code: ERROR_CODES.DUPLICATE_ENTRY
         });
       }
+    }
+    
+    // 检查通知频率限制 - 防止API滥用
+    const recentNotificationsCount = await Notification.countDocuments({
+      subscriptionId: subscription._id,
+      receivedAt: { $gte: new Date(Date.now() - 60 * 1000) } // 最近1分钟
+    });
+    
+    if (recentNotificationsCount >= 30) { // 每分钟最多30条通知
+      return res.status(429).json(
+        createErrorResponse(
+          '通知发送频率过高，请稍后再试', 
+          ERROR_CODES.NOTIFICATION_THROTTLED,
+          { 
+            limit: 30,
+            period: '1分钟',
+            current: recentNotificationsCount
+          },
+          req.originalUrl
+        )
+      );
     }
 
     // 创建通知
@@ -83,7 +138,38 @@ router.post('/receive', [
     });
   } catch (error) {
     console.error('接收通知错误:', error);
-    res.status(500).json({ error: '服务器内部错误' });
+    
+    // 区分不同类型的错误
+    if (error.name === 'ValidationError') {
+      return res.status(400).json(
+        createErrorResponse(
+          '通知数据验证失败', 
+          ERROR_CODES.DATA_VALIDATION_FAILED,
+          { details: error.message },
+          req.originalUrl
+        )
+      );
+    }
+    
+    if (error.name === 'MongoError' && error.code === 11000) {
+      return res.status(409).json(
+        createErrorResponse(
+          '重复的通知ID', 
+          ERROR_CODES.DUPLICATE_ENTRY,
+          null,
+          req.originalUrl
+        )
+      );
+    }
+    
+    res.status(500).json(
+      createErrorResponse(
+        '服务器内部错误', 
+        ERROR_CODES.INTERNAL_ERROR,
+        null,
+        req.originalUrl
+      )
+    );
   }
 });
 
@@ -119,7 +205,14 @@ router.get('/stats', auth, async (req, res) => {
     });
   } catch (error) {
     console.error('获取通知统计错误:', error);
-    res.status(500).json({ error: '服务器内部错误' });
+    res.status(500).json(
+      createErrorResponse(
+        '服务器内部错误', 
+        ERROR_CODES.INTERNAL_ERROR,
+        null,
+        req.originalUrl
+      )
+    );
   }
 });
 
@@ -376,7 +469,14 @@ router.get('/:id', auth, async (req, res) => {
     }).populate('subscriptionId', 'thirdPartyName thirdPartyUrl mode');
 
     if (!notification) {
-      return res.status(404).json({ error: '通知不存在' });
+      return res.status(404).json(
+        createErrorResponse(
+          '通知不存在', 
+          ERROR_CODES.NOTIFICATION_NOT_FOUND,
+          null,
+          req.originalUrl
+        )
+      );
     }
 
     res.json({
@@ -408,7 +508,26 @@ router.get('/:id', auth, async (req, res) => {
     });
   } catch (error) {
     console.error('获取通知详情错误:', error);
-    res.status(500).json({ error: '服务器内部错误' });
+    
+    if (error.name === 'CastError' && error.kind === 'ObjectId') {
+      return res.status(400).json(
+        createErrorResponse(
+          '无效的通知ID格式', 
+          ERROR_CODES.INVALID_FORMAT,
+          null,
+          req.originalUrl
+        )
+      );
+    }
+    
+    res.status(500).json(
+      createErrorResponse(
+        '服务器内部错误', 
+        ERROR_CODES.INTERNAL_ERROR,
+        null,
+        req.originalUrl
+      )
+    );
   }
 });
 
@@ -421,7 +540,14 @@ router.patch('/:id/read', auth, async (req, res) => {
     });
 
     if (!notification) {
-      return res.status(404).json({ error: '通知不存在' });
+      return res.status(404).json(
+        createErrorResponse(
+          '通知不存在', 
+          ERROR_CODES.NOTIFICATION_NOT_FOUND,
+          null,
+          req.originalUrl
+        )
+      );
     }
 
     if (!notification.isRead) {
@@ -438,7 +564,14 @@ router.patch('/:id/read', auth, async (req, res) => {
     });
   } catch (error) {
     console.error('标记通知已读错误:', error);
-    res.status(500).json({ error: '服务器内部错误' });
+    res.status(500).json(
+      createErrorResponse(
+        '服务器内部错误', 
+        ERROR_CODES.INTERNAL_ERROR,
+        null,
+        req.originalUrl
+      )
+    );
   }
 });
 
@@ -451,13 +584,27 @@ router.delete('/:id', auth, async (req, res) => {
     });
 
     if (!notification) {
-      return res.status(404).json({ error: '通知不存在' });
+      return res.status(404).json(
+        createErrorResponse(
+          '通知不存在', 
+          ERROR_CODES.RESOURCE_NOT_FOUND,
+          null,
+          req.originalUrl
+        )
+      );
     }
 
     res.json({ message: '通知删除成功' });
   } catch (error) {
     console.error('删除通知错误:', error);
-    res.status(500).json({ error: '服务器内部错误' });
+    res.status(500).json(
+      createErrorResponse(
+        '服务器内部错误', 
+        ERROR_CODES.INTERNAL_ERROR,
+        null,
+        req.originalUrl
+      )
+    );
   }
 });
 

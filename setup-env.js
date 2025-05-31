@@ -59,4 +59,4 @@ try {
   process.exit(1);
 }
 
-console.log('\n�� 配置完成！回声平台已准备就绪。'); 
+console.log('\n配置完成！回声平台已准备就绪。'); 

@@ -667,6 +667,8 @@ curl -X POST https://huisheen.com/api/notifications/receive \
 
 ### 🚨 错误响应格式
 
+所有API错误都使用标准化的格式返回，方便客户端统一处理：
+
 ```json
 {
   "error": "错误描述信息",
@@ -674,11 +676,11 @@ curl -X POST https://huisheen.com/api/notifications/receive \
   "details": {
     "field": "具体错误字段",
     "message": "详细错误信息"
-  }
+  },
+  "timestamp": "2023-12-01T10:00:00.000Z",
+  "path": "/api/endpoint/path"
 }
 ```
-
-> 注意：当前实现通常只返回简化版的错误响应，包含`error`字段。完整的错误详情格式将在后续版本中实现。
 
 **错误响应参数说明**:
 
@@ -689,21 +691,94 @@ curl -X POST https://huisheen.com/api/notifications/receive \
 | `details` | object/array | 详细错误信息，可能是对象或数组 |
 | `details.field` | string | 出错的字段名称（验证错误时） |
 | `details.message` | string | 该字段的具体错误信息 |
-| `timestamp` | string | 错误发生的时间戳（可选） |
-| `path` | string | 发生错误的API路径（可选） |
+| `timestamp` | string | 错误发生的时间戳|
+| `path` | string | 发生错误的API路径|
 
-**常见错误代码**:
+**错误代码完整列表**:
 
-| 错误代码 | 说明 |
-|---------|------|
-| `INVALID_PARAMETERS` | 请求参数验证失败 |
-| `AUTHENTICATION_FAILED` | 认证失败 |
-| `INVALID_TOKEN` | 无效的Token |
-| `TOKEN_EXPIRED` | Token已过期 |
-| `RESOURCE_NOT_FOUND` | 请求的资源不存在 |
-| `PERMISSION_DENIED` | 权限不足 |
-| `RATE_LIMIT_EXCEEDED` | 超出请求频率限制 |
-| `INTERNAL_ERROR` | 服务器内部错误 |
+| 错误代码 | HTTP状态码 | 说明 | 处理建议 |
+|---------|-----------|------|---------|
+| **验证和参数错误** |
+| `INVALID_PARAMETERS` | 400 | 请求参数验证失败 | 检查请求参数是否符合要求 |
+| `VALIDATION_FAILED` | 400 | 数据验证失败 | 根据details中的字段信息修正输入 |
+| `MISSING_REQUIRED_FIELD` | 400 | 缺少必需字段 | 确保请求包含所有必需字段 |
+| `INVALID_FORMAT` | 400 | 格式错误 | 检查输入格式是否符合要求 |
+| **认证和授权错误** |
+| `AUTHENTICATION_FAILED` | 401 | 认证失败 | 检查认证信息是否正确 |
+| `INVALID_TOKEN` | 401 | 无效的Token | 使用有效的Token重新请求 |
+| `TOKEN_EXPIRED` | 401 | Token已过期 | 重新获取Token |
+| `INVALID_CREDENTIALS` | 401 | 凭据无效（用户名/密码错误） | 检查用户名和密码是否正确 |
+| `PERMISSION_DENIED` | 403 | 权限不足 | 检查是否有足够权限执行操作 |
+| `ACCOUNT_DISABLED` | 403 | 账户已禁用 | 联系管理员解决账户问题 |
+| **资源错误** |
+| `RESOURCE_NOT_FOUND` | 404 | 请求的资源不存在 | 检查资源ID或路径是否正确 |
+| `RESOURCE_ALREADY_EXISTS` | 409 | 资源已存在 | 尝试使用不同的标识符 |
+| `RESOURCE_CONFLICT` | 409 | 资源冲突 | 解决冲突后重试 |
+| **操作错误** |
+| `OPERATION_FAILED` | 400 | 操作失败 | 根据错误信息尝试修正请求 |
+| `RATE_LIMIT_EXCEEDED` | 429 | 超出请求频率限制 | 降低请求频率 |
+| `TOO_MANY_REQUESTS` | 429 | 请求过多 | 稍后重试或减少并发请求 |
+| **通知相关错误** |
+| `NOTIFICATION_SEND_FAILED` | 400 | 通知发送失败 | 检查通知参数和目标 |
+| `SUBSCRIPTION_ERROR` | 400 | 订阅错误 | 检查订阅配置 |
+| `POLLING_ERROR` | 400 | 轮询错误 | 检查被轮询的API配置 |
+| **服务端错误** |
+| `INTERNAL_ERROR` | 500 | 服务器内部错误 | 联系服务管理员或稍后重试 |
+| `SERVICE_UNAVAILABLE` | 503 | 服务不可用 | 等待服务恢复后重试 |
+| `DATABASE_ERROR` | 500 | 数据库错误 | 联系服务管理员 |
+
+### 错误处理建议
+
+1. **检查错误代码**: 使用错误代码而非错误消息来确定错误类型，因为消息文本可能会变化
+2. **重试策略**:
+   - 对于`5xx`错误，使用指数退避算法重试
+   - 对于`429`错误，根据响应头中的`Retry-After`字段等待后重试
+   - 对于`4xx`错误，除非是`RESOURCE_CONFLICT`，通常不应自动重试
+3. **友好提示**: 将技术错误转换为用户友好的提示
+4. **日志记录**: 记录详细错误信息用于故障排查
+5. **全局处理器**: 在客户端实现统一的错误处理器，便于一致处理各种错误
+
+**例子 - 错误处理代码片段**:
+
+```javascript
+// JavaScript/Node.js 错误处理示例
+async function makeApiRequest() {
+  try {
+    const response = await fetch('https://huisheen.com/api/external/notifications');
+    if (!response.ok) {
+      const errorData = await response.json();
+      handleApiError(response.status, errorData);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('API请求失败:', error);
+    throw error;
+  }
+}
+
+function handleApiError(status, errorData) {
+  switch(errorData.code) {
+    case 'TOKEN_EXPIRED':
+      // 刷新token
+      refreshToken();
+      break;
+    case 'RATE_LIMIT_EXCEEDED':
+      // 实现退避重试
+      scheduleRetry();
+      break;
+    case 'VALIDATION_FAILED':
+      // 显示字段验证错误
+      showValidationErrors(errorData.details);
+      break;
+    default:
+      // 通用错误处理
+      showErrorMessage(errorData.error);
+  }
+  
+  // 记录错误
+  logError(status, errorData);
+}
+```
 
 ### ⚡ 使用建议
 

@@ -4,6 +4,7 @@ const adminAuth = require('../middleware/adminAuth');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
 const Subscription = require('../models/Subscription');
+const { ERROR_CODES, createErrorResponse } = require('../utils/errorHandler');
 
 const router = express.Router();
 
@@ -64,7 +65,14 @@ router.get('/stats', async (req, res) => {
     });
   } catch (error) {
     console.error('获取管理员统计数据错误:', error);
-    res.status(500).json({ error: '服务器内部错误' });
+    res.status(500).json(
+      createErrorResponse(
+        '服务器内部错误', 
+        ERROR_CODES.INTERNAL_ERROR,
+        null,
+        req.originalUrl
+      )
+    );
   }
 });
 
@@ -75,7 +83,14 @@ router.get('/users', async (req, res) => {
     res.json({ users });
   } catch (error) {
     console.error('获取用户列表错误:', error);
-    res.status(500).json({ error: '服务器内部错误' });
+    res.status(500).json(
+      createErrorResponse(
+        '服务器内部错误', 
+        ERROR_CODES.INTERNAL_ERROR,
+        null,
+        req.originalUrl
+      )
+    );
   }
 });
 
@@ -99,7 +114,14 @@ router.get('/services', async (req, res) => {
     res.json({ services: result });
   } catch (error) {
     console.error('获取服务统计错误:', error);
-    res.status(500).json({ error: '服务器内部错误' });
+    res.status(500).json(
+      createErrorResponse(
+        '服务器内部错误', 
+        ERROR_CODES.INTERNAL_ERROR,
+        null,
+        req.originalUrl
+      )
+    );
   }
 });
 

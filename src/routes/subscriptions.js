@@ -6,6 +6,7 @@ const auth = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
 const config = require('../config/config');
 const { validateNotifyCodeDomain, validateThirdPartyUrl } = require('../utils/domainValidator');
+const { ERROR_CODES, createErrorResponse } = require('../utils/errorHandler');
 
 const router = express.Router();
 
@@ -34,7 +35,14 @@ router.post('/passive', auth, [
       serviceInfoUrl = `${baseUrl}/api/service-info`;
       serviceHost = url.host.toLowerCase(); // 使用host（包含端口）作为唯一标识
     } catch (error) {
-      return res.status(400).json({ error: 'API地址格式不正确' });
+      return res.status(400).json(
+        createErrorResponse(
+          'API地址格式不正确', 
+          ERROR_CODES.INVALID_URL,
+          null,
+          req.originalUrl
+        )
+      );
     }
     
     // 调用第三方服务获取服务信息
@@ -45,7 +53,7 @@ router.post('/passive', auth, [
       serviceInfo = response.data;
     } catch (error) {
       console.error('获取服务信息失败:', error.message);
-      // 如果无法获取服务信息，使用默认值
+      // 如果无法获取服务信息，使用默认值，但也记录错误
       const url = new URL(apiUrl);
       serviceInfo = {
         name: `第三方服务 (${url.hostname})`,
@@ -53,6 +61,12 @@ router.post('/passive', auth, [
         polling_interval: 5,
         api_endpoint: apiUrl
       };
+      // 记录外部服务错误日志，但不返回错误，使用默认配置继续
+      console.warn('EXTERNAL_SERVICE_ERROR:', {
+        url: serviceInfoUrl,
+        message: error.message,
+        status: error.response?.status
+      });
     }
     
     const thirdPartyName = serviceInfo.name;
@@ -137,7 +151,27 @@ router.post('/passive', auth, [
     });
   } catch (error) {
     console.error('创建被动订阅错误:', error);
-    res.status(500).json({ error: '服务器内部错误' });
+    
+    // 区分不同类型的错误
+    if (error.name === 'AxiosError') {
+      return res.status(503).json(
+        createErrorResponse(
+          '无法连接到外部服务', 
+          ERROR_CODES.EXTERNAL_SERVICE_ERROR,
+          { message: error.message },
+          req.originalUrl
+        )
+      );
+    }
+    
+    res.status(500).json(
+      createErrorResponse(
+        '服务器内部错误', 
+        ERROR_CODES.INTERNAL_ERROR,
+        null,
+        req.originalUrl
+      )
+    );
   }
 });
 
@@ -180,7 +214,14 @@ router.post('/active/verify', [
     
     const parts = codeWithoutDomain.split(':');
     if (parts.length !== 4) {
-      return res.status(400).json({ error: '通知标识码格式不正确' });
+      return res.status(400).json(
+        createErrorResponse(
+          '通知标识码格式不正确', 
+          ERROR_CODES.INVALID_FORMAT,
+          null,
+          req.originalUrl
+        )
+      );
     }
     
     const notifyId = parts[2];
@@ -192,18 +233,39 @@ router.post('/active/verify', [
       const url = new URL(thirdPartyUrl);
       serviceHost = url.host.toLowerCase();
     } catch (error) {
-      return res.status(400).json({ error: '第三方服务URL格式不正确' });
+      return res.status(400).json(
+        createErrorResponse(
+          '第三方服务URL格式不正确', 
+          ERROR_CODES.INVALID_URL,
+          null,
+          req.originalUrl
+        )
+      );
     }
 
     // 查找用户
     const user = await User.findOne({ notifyId });
     if (!user) {
-      return res.status(404).json({ error: '无效的通知标识码' });
+      return res.status(404).json(
+        createErrorResponse(
+          '无效的通知标识码', 
+          ERROR_CODES.RESOURCE_NOT_FOUND,
+          null,
+          req.originalUrl
+        )
+      );
     }
 
     // 验证标识码
     if (!user.verifyNotifyCode(verificationCode)) {
-      return res.status(400).json({ error: '通知标识码已过期或无效' });
+      return res.status(400).json(
+        createErrorResponse(
+          '通知标识码已过期或无效', 
+          ERROR_CODES.RESOURCE_EXPIRED,
+          null,
+          req.originalUrl
+        )
+      );
     }
 
     // 检查是否已存在相同主机的主动模式订阅
@@ -260,7 +322,14 @@ router.post('/active/verify', [
     });
   } catch (error) {
     console.error('验证主动订阅错误:', error);
-    res.status(500).json({ error: '服务器内部错误' });
+    res.status(500).json(
+      createErrorResponse(
+        '服务器内部错误', 
+        ERROR_CODES.INTERNAL_ERROR,
+        null,
+        req.originalUrl
+      )
+    );
   }
 });
 
@@ -288,7 +357,14 @@ router.get('/', auth, async (req, res) => {
     });
   } catch (error) {
     console.error('获取订阅列表错误:', error);
-    res.status(500).json({ error: '服务器内部错误' });
+    res.status(500).json(
+      createErrorResponse(
+        '服务器内部错误', 
+        ERROR_CODES.INTERNAL_ERROR,
+        null,
+        req.originalUrl
+      )
+    );
   }
 });
 
@@ -306,7 +382,14 @@ router.patch('/:id/status', auth, [
     });
 
     if (!subscription) {
-      return res.status(404).json({ error: '订阅不存在' });
+      return res.status(404).json(
+        createErrorResponse(
+          '订阅不存在', 
+          ERROR_CODES.RESOURCE_NOT_FOUND,
+          null,
+          req.originalUrl
+        )
+      );
     }
 
     subscription.isActive = isActive;
@@ -321,7 +404,14 @@ router.patch('/:id/status', auth, [
     });
   } catch (error) {
     console.error('更新订阅状态错误:', error);
-    res.status(500).json({ error: '服务器内部错误' });
+    res.status(500).json(
+      createErrorResponse(
+        '服务器内部错误', 
+        ERROR_CODES.INTERNAL_ERROR,
+        null,
+        req.originalUrl
+      )
+    );
   }
 });
 
@@ -334,13 +424,27 @@ router.delete('/:id', auth, async (req, res) => {
     });
 
     if (!subscription) {
-      return res.status(404).json({ error: '订阅不存在' });
+      return res.status(404).json(
+        createErrorResponse(
+          '订阅不存在', 
+          ERROR_CODES.RESOURCE_NOT_FOUND,
+          null,
+          req.originalUrl
+        )
+      );
     }
 
     res.json({ message: '订阅删除成功' });
   } catch (error) {
     console.error('删除订阅错误:', error);
-    res.status(500).json({ error: '服务器内部错误' });
+    res.status(500).json(
+      createErrorResponse(
+        '服务器内部错误', 
+        ERROR_CODES.INTERNAL_ERROR,
+        null,
+        req.originalUrl
+      )
+    );
   }
 });
 
@@ -355,7 +459,14 @@ router.post('/:id/trigger-poll', auth, async (req, res) => {
     });
 
     if (!subscription) {
-      return res.status(404).json({ error: '被动订阅不存在或已禁用' });
+      return res.status(404).json(
+        createErrorResponse(
+          '被动订阅不存在或已禁用', 
+          ERROR_CODES.SUBSCRIPTION_NOT_FOUND,
+          null,
+          req.originalUrl
+        )
+      );
     }
 
     // 检查是否在1分钟冷却期内
@@ -364,10 +475,14 @@ router.post('/:id/trigger-poll', auth, async (req, res) => {
     
     if (subscription.lastManualTrigger && subscription.lastManualTrigger > oneMinuteAgo) {
       const remainingSeconds = Math.ceil((subscription.lastManualTrigger.getTime() + 60 * 1000 - now.getTime()) / 1000);
-      return res.status(429).json({ 
-        error: `请等待 ${remainingSeconds} 秒后再次手动触发`,
-        remainingSeconds
-      });
+      return res.status(429).json(
+        createErrorResponse(
+          `请等待 ${remainingSeconds} 秒后再次手动触发`, 
+          ERROR_CODES.POLLING_ERROR,
+          { remainingSeconds, reason: 'cooldown' },
+          req.originalUrl
+        )
+      );
     }
 
     // 更新手动触发时间
@@ -388,7 +503,36 @@ router.post('/:id/trigger-poll', auth, async (req, res) => {
     });
   } catch (error) {
     console.error('手动触发轮询错误:', error);
-    res.status(500).json({ error: '服务器内部错误' });
+    
+    // 区分轮询过程中的外部API错误
+    if (error.name === 'AxiosError') {
+      return res.status(502).json(
+        createErrorResponse(
+          '轮询外部服务失败', 
+          ERROR_CODES.EXTERNAL_API_ERROR,
+          { message: error.message },
+          req.originalUrl
+        )
+      );
+    } else if (error.message && error.message.includes('polling')) {
+      return res.status(500).json(
+        createErrorResponse(
+          '轮询过程中发生错误', 
+          ERROR_CODES.POLLING_ERROR,
+          null,
+          req.originalUrl
+        )
+      );
+    }
+    
+    res.status(500).json(
+      createErrorResponse(
+        '服务器内部错误', 
+        ERROR_CODES.INTERNAL_ERROR,
+        null,
+        req.originalUrl
+      )
+    );
   }
 });
 

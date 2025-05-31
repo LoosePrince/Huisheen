@@ -166,17 +166,30 @@ app.get('*', (req, res) => {
 app.use((error, req, res, next) => {
   console.error('服务器错误:', error);
   
+  const { ERROR_CODES, createErrorResponse } = require('./utils/errorHandler');
+  
   // 开发环境返回详细错误信息
   if (config.nodeEnv === 'development') {
-    res.status(500).json({
-      error: '服务器内部错误',
-      message: error.message,
-      stack: error.stack
-    });
+    res.status(500).json(
+      createErrorResponse(
+        '服务器内部错误', 
+        ERROR_CODES.INTERNAL_ERROR,
+        {
+          message: error.message,
+          stack: error.stack
+        },
+        req.originalUrl
+      )
+    );
   } else {
-    res.status(500).json({
-      error: '服务器内部错误'
-    });
+    res.status(500).json(
+      createErrorResponse(
+        '服务器内部错误', 
+        ERROR_CODES.INTERNAL_ERROR,
+        null,
+        req.originalUrl
+      )
+    );
   }
 });
 

@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 const config = require('../config/config');
+const { ERROR_CODES } = require('../utils/errorHandler');
 
 class EmailService {
   constructor() {
@@ -34,12 +35,23 @@ class EmailService {
     } catch (error) {
       console.error('邮件服务初始化失败:', error.message);
       this.initialized = false;
+      
+      // 根据错误类型设置不同的错误代码
+      if (error.code === 'ESOCKET' || error.code === 'ECONNREFUSED') {
+        error.errorCode = ERROR_CODES.NETWORK_ERROR;
+      } else if (error.code === 'EAUTH') {
+        error.errorCode = ERROR_CODES.AUTHENTICATION_FAILED;
+      } else {
+        error.errorCode = ERROR_CODES.CONFIG_ERROR;
+      }
     }
   }
 
   async sendVerificationEmail(to, code, username) {
     if (!this.initialized) {
-      throw new Error('邮件服务未初始化或配置不正确');
+      const error = new Error('邮件服务未初始化或配置不正确');
+      error.code = ERROR_CODES.SERVICE_UNAVAILABLE;
+      throw error;
     }
 
     const subject = '回声 - 邮箱验证';
@@ -57,7 +69,28 @@ class EmailService {
       return { success: true, messageId: info.messageId };
     } catch (error) {
       console.error('发送验证邮件失败:', error);
-      throw new Error('发送邮件失败：' + error.message);
+      
+      // 设置更具体的错误代码
+      let errorCode = ERROR_CODES.NOTIFICATION_SEND_FAILED;
+      
+      if (error.code === 'EENVELOPE' || error.responseCode === 550) {
+        // 收件人地址无效
+        errorCode = ERROR_CODES.INVALID_EMAIL;
+      } else if (error.code === 'ETIMEDOUT') {
+        // SMTP服务器连接超时
+        errorCode = ERROR_CODES.OPERATION_TIMED_OUT;
+      } else if (error.code === 'EAUTH' || error.responseCode === 535) {
+        // 邮件服务器认证失败
+        errorCode = ERROR_CODES.AUTHENTICATION_FAILED;
+      } else if (error.code === 'EMESSAGE') {
+        // 邮件内容问题
+        errorCode = ERROR_CODES.DATA_FORMAT_ERROR;
+      }
+      
+      const wrappedError = new Error('发送邮件失败：' + error.message);
+      wrappedError.code = errorCode;
+      wrappedError.originalError = error;
+      throw wrappedError;
     }
   }
 

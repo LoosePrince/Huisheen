@@ -7,6 +7,7 @@ const { handleValidationErrors } = require('../middleware/validation');
 const jwt = require('jsonwebtoken');
 const config = require('../config/config');
 const { validateNotifyCodeDomain, validateThirdPartyUrl } = require('../utils/domainValidator');
+const { ERROR_CODES, createErrorResponse } = require('../utils/errorHandler');
 
 const router = express.Router();
 
@@ -15,7 +16,14 @@ const externalAuth = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: '缺少认证Token' });
+      return res.status(401).json(
+        createErrorResponse(
+          '缺少认证Token', 
+          ERROR_CODES.AUTHENTICATION_FAILED,
+          null,
+          req.originalUrl
+        )
+      );
     }
 
     const token = authHeader.substring(7);
@@ -25,24 +33,64 @@ const externalAuth = async (req, res, next) => {
       
       // 验证token类型
       if (decoded.type !== 'external_api') {
-        return res.status(401).json({ error: 'Token类型无效' });
+        return res.status(401).json(
+          createErrorResponse(
+            'Token类型无效', 
+            ERROR_CODES.INVALID_TOKEN,
+            null,
+            req.originalUrl
+          )
+        );
       }
 
       // 查找用户
       const user = await User.findOne({ notifyId: decoded.notifyId });
       if (!user) {
-        return res.status(401).json({ error: '用户不存在' });
+        return res.status(401).json(
+          createErrorResponse(
+            '用户不存在', 
+            ERROR_CODES.INVALID_TOKEN,
+            null,
+            req.originalUrl
+          )
+        );
       }
 
       req.user = user;
       req.notifyId = decoded.notifyId;
       next();
     } catch (jwtError) {
-      return res.status(401).json({ error: 'Token无效或已过期' });
+      // 处理JWT错误
+      if (jwtError.name === 'TokenExpiredError') {
+        return res.status(401).json(
+          createErrorResponse(
+            'Token已过期', 
+            ERROR_CODES.TOKEN_EXPIRED,
+            null,
+            req.originalUrl
+          )
+        );
+      } else {
+        return res.status(401).json(
+          createErrorResponse(
+            'Token无效或已过期', 
+            ERROR_CODES.INVALID_TOKEN,
+            null,
+            req.originalUrl
+          )
+        );
+      }
     }
   } catch (error) {
     console.error('外部API认证错误:', error);
-    res.status(500).json({ error: '服务器内部错误' });
+    res.status(500).json(
+      createErrorResponse(
+        '服务器内部错误', 
+        ERROR_CODES.INTERNAL_ERROR,
+        null,
+        req.originalUrl
+      )
+    );
   }
 };
 

@@ -1,20 +1,18 @@
 const { validationResult } = require('express-validator');
+const { createValidationErrorResponse } = require('../utils/errorHandler');
 
 const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
   
   if (!errors.isEmpty()) {
-    return res.status(400).json({
-      error: '数据验证失败',
-      details: errors.array().map(error => ({
-        field: error.param,
-        message: error.msg,
-        value: error.value
-      }))
-    });
+    return res.status(400).json(
+      createValidationErrorResponse(errors.array(), req.originalUrl)
+    );
   }
   
   next();
 };
 
-module.exports = { handleValidationErrors }; 
+module.exports = {
+  handleValidationErrors
+}; 
