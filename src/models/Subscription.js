@@ -56,6 +56,23 @@ const subscriptionSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  // 服务状态（用于管理员控制）
+  serviceStatus: {
+    isActive: {
+      type: Boolean,
+      default: true
+    },
+    updatedAt: {
+      type: Date
+    },
+    updatedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    reason: {
+      type: String
+    }
+  },
   subscribedAt: {
     type: Date,
     default: Date.now

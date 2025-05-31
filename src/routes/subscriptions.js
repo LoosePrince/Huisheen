@@ -352,7 +352,8 @@ router.get('/', auth, async (req, res) => {
         lastNotificationAt: sub.lastNotificationAt,
         notificationCount: sub.notificationCount,
         pollingInterval: sub.pollingInterval,
-        apiEndpoint: sub.apiEndpoint
+        apiEndpoint: sub.apiEndpoint,
+        serviceStatus: sub.serviceStatus
       }))
     });
   } catch (error) {
@@ -387,6 +388,18 @@ router.patch('/:id/status', auth, [
           '订阅不存在', 
           ERROR_CODES.RESOURCE_NOT_FOUND,
           null,
+          req.originalUrl
+        )
+      );
+    }
+    
+    // 检查服务是否被管理员禁用
+    if (subscription.serviceStatus && subscription.serviceStatus.isActive === false) {
+      return res.status(403).json(
+        createErrorResponse(
+          '此服务已被管理员禁用，无法修改状态', 
+          ERROR_CODES.OPERATION_NOT_ALLOWED,
+          { reason: 'service_disabled' },
           req.originalUrl
         )
       );
@@ -468,6 +481,18 @@ router.post('/:id/trigger-poll', auth, async (req, res) => {
         )
       );
     }
+    
+    // 检查服务是否被管理员禁用
+    if (subscription.serviceStatus && subscription.serviceStatus.isActive === false) {
+      return res.status(403).json(
+        createErrorResponse(
+          '此服务已被管理员禁用，无法进行轮询', 
+          ERROR_CODES.OPERATION_NOT_ALLOWED,
+          { reason: 'service_disabled' },
+          req.originalUrl
+        )
+      );
+    }
 
     // 检查是否在1分钟冷却期内
     const now = new Date();
@@ -526,6 +551,134 @@ router.post('/:id/trigger-poll', auth, async (req, res) => {
     }
     
     res.status(500).json(
+      createErrorResponse(
+        '服务器内部错误', 
+        ERROR_CODES.INTERNAL_ERROR,
+        null,
+        req.originalUrl
+      )
+    );
+  }
+});
+
+// 获取用户拥有的服务统计
+router.get('/my-services', auth, async (req, res) => {
+  try {
+    // 获取当前用户的通知ID
+    const userNotifyId = req.user.notifyId;
+    
+    // 查找所有订阅，按serviceHost分组
+    const subscriptions = await Subscription.find();
+    
+    // 按服务分组，并筛选出当前用户是服务所有者的订阅
+    const servicesMap = new Map();
+    
+    for (const sub of subscriptions) {
+      // 获取服务配置中的owner_notify_id
+      const ownerNotifyId = sub.config?.serviceInfo?.owner_notify_id;
+      
+      // 如果当前用户是服务所有者，则计入统计
+      if (ownerNotifyId && ownerNotifyId === userNotifyId) {
+        const serviceKey = sub.serviceHost;
+        
+        if (!servicesMap.has(serviceKey)) {
+          servicesMap.set(serviceKey, {
+            id: serviceKey,
+            name: sub.thirdPartyName,
+            url: sub.thirdPartyUrl,
+            subscriberCount: 0,
+            subscribers: [],
+            apiEndpoint: sub.apiEndpoint || null,
+            config: sub.config
+          });
+        }
+        
+        const service = servicesMap.get(serviceKey);
+        
+        // 不计算服务所有者自己的订阅到订阅者数量中
+        if (sub.userId.toString() !== req.user._id.toString()) {
+          service.subscriberCount += 1;
+          
+          // 添加订阅者信息（但不包含敏感信息）
+          if (!service.subscribers.some(s => s.userId === sub.userId.toString())) {
+            service.subscribers.push({
+              userId: sub.userId.toString(),
+              subscriptionId: sub._id.toString(),
+              subscribedAt: sub.subscribedAt
+            });
+          }
+        } else {
+          // 记录所有者自己的信息
+          service.isOwnerSubscribed = true;
+        }
+      }
+    }
+    
+    // 转换为数组
+    const myServices = Array.from(servicesMap.values());
+    
+    res.json({
+      myServices,
+      total: myServices.length
+    });
+  } catch (error) {
+    console.error('获取用户服务统计错误:', error);
+    res.status(500).json(
+      createErrorResponse(
+        '服务器内部错误', 
+        ERROR_CODES.INTERNAL_ERROR,
+        null,
+        req.originalUrl
+      )
+    );
+  }
+});
+
+// 预览服务信息（用于避免前端CORS问题）
+router.get('/preview-service', [
+  query('url').isURL({ require_tld: false }).withMessage('请输入有效的URL格式'),
+  handleValidationErrors
+], async (req, res) => {
+  try {
+    const apiUrl = req.query.url;
+    
+    // 从API URL推导服务信息端点
+    let serviceInfoUrl;
+    try {
+      const url = new URL(apiUrl);
+      const baseUrl = `${url.protocol}//${url.host}`;
+      serviceInfoUrl = `${baseUrl}/api/service-info`;
+    } catch (error) {
+      return res.status(400).json(
+        createErrorResponse(
+          'API地址格式不正确', 
+          ERROR_CODES.INVALID_URL,
+          null,
+          req.originalUrl
+        )
+      );
+    }
+    
+    // 调用第三方服务获取服务信息
+    try {
+      const axios = require('axios');
+      const response = await axios.get(serviceInfoUrl, { timeout: 10000 });
+      return res.json(response.data);
+    } catch (error) {
+      console.error('获取服务信息失败:', error.message);
+      // 返回错误
+      return res.status(503).json(
+        createErrorResponse(
+          '无法获取服务信息', 
+          ERROR_CODES.EXTERNAL_SERVICE_ERROR,
+          { message: error.message },
+          req.originalUrl
+        )
+      );
+    }
+  } catch (error) {
+    console.error('预览服务错误:', error);
+    return res.status(500).json(
       createErrorResponse(
         '服务器内部错误', 
         ERROR_CODES.INTERNAL_ERROR,

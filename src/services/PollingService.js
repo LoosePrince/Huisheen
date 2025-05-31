@@ -44,7 +44,12 @@ class PollingService {
       const subscriptions = await Subscription.find({
         mode: 'passive',
         isActive: true,
-        apiEndpoint: { $exists: true, $ne: null }
+        apiEndpoint: { $exists: true, $ne: null },
+        $or: [
+          { "serviceStatus.isActive": true },
+          { "serviceStatus.isActive": { $exists: false } },
+          { serviceStatus: { $exists: false } }
+        ]
       }).populate('userId');
 
       for (const subscription of subscriptions) {
@@ -196,6 +201,11 @@ class PollingService {
       
       if (!subscription || subscription.mode !== 'passive') {
         throw new Error('订阅不存在或不是被动模式');
+      }
+      
+      // 检查服务状态
+      if (subscription.serviceStatus && subscription.serviceStatus.isActive === false) {
+        throw new Error('服务已被管理员禁用，无法进行轮询');
       }
 
       await this.pollSubscription(subscription);

@@ -6,6 +6,7 @@ const User = require('../models/User');
 const auth = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
 const { ERROR_CODES, createErrorResponse } = require('../utils/errorHandler');
+const mongoose = require('mongoose');
 
 const router = express.Router();
 
@@ -21,27 +22,15 @@ router.post('/receive', [
   handleValidationErrors
 ], async (req, res) => {
   try {
-    const { notifyId, token, title, content, type, priority, source, metadata, externalId, callbackUrl } = req.body;
-
-    // 验证token
-    const decodedToken = Subscription.verifyToken(token);
-    if (!decodedToken) {
-      return res.status(401).json(
-        createErrorResponse(
-          '无效的Token', 
-          ERROR_CODES.PUSH_TOKEN_INVALID,
-          null,
-          req.originalUrl
-        )
-      );
-    }
-
+    const { notifyId, token, title, content, type = 'info', priority = 'normal', callbackUrl, externalId, metadata } = req.body;
+    
     // 查找订阅
-    const subscription = await Subscription.findById(decodedToken.subscriptionId);
+    const subscription = await Subscription.findOne({ token });
+    
     if (!subscription) {
       return res.status(404).json(
         createErrorResponse(
-          '订阅不存在', 
+          '订阅不存在或令牌无效', 
           ERROR_CODES.SUBSCRIPTION_NOT_FOUND,
           null,
           req.originalUrl
@@ -49,119 +38,95 @@ router.post('/receive', [
       );
     }
     
+    // 检查订阅是否被禁用
     if (!subscription.isActive) {
       return res.status(403).json(
         createErrorResponse(
-          '订阅已禁用', 
-          ERROR_CODES.SUBSCRIPTION_ERROR,
-          { reason: 'disabled' },
-          req.originalUrl
-        )
-      );
-    }
-
-    // 验证用户和通知ID匹配
-    const user = await User.findById(subscription.userId);
-    if (!user || user.notifyId !== notifyId) {
-      return res.status(401).json(
-        createErrorResponse(
-          '通知ID与Token不匹配', 
-          ERROR_CODES.PERMISSION_DENIED,
+          '此订阅已被禁用，无法接收通知', 
+          ERROR_CODES.SUBSCRIPTION_DISABLED,
           null,
           req.originalUrl
         )
       );
     }
-
-    // 检查是否重复通知 (如果提供了externalId)
-    if (externalId) {
-      const existingNotification = await Notification.findOne({
-        subscriptionId: subscription._id,
-        externalId
-      });
-      
-      if (existingNotification) {
-        return res.status(200).json({ 
-          message: '通知已存在',
-          notificationId: existingNotification._id,
-          code: ERROR_CODES.DUPLICATE_ENTRY
-        });
-      }
+    
+    // 检查服务是否被管理员禁用
+    if (subscription.serviceStatus && subscription.serviceStatus.isActive === false) {
+      return res.status(403).json(
+        createErrorResponse(
+          '此服务已被管理员禁用，无法接收通知', 
+          ERROR_CODES.SERVICE_DISABLED,
+          { reason: 'service_disabled' },
+          req.originalUrl
+        )
+      );
     }
     
-    // 检查通知频率限制 - 防止API滥用
-    const recentNotificationsCount = await Notification.countDocuments({
+    // 准备通知数据
+    const notificationData = {
+      userId: subscription.userId,
       subscriptionId: subscription._id,
-      receivedAt: { $gte: new Date(Date.now() - 60 * 1000) } // 最近1分钟
-    });
+      title,
+      content,
+      type,
+      priority,
+      callbackUrl,
+      source: {
+        name: subscription.thirdPartyName,
+        url: subscription.thirdPartyUrl
+      },
+      metadata,
+      receivedAt: new Date()
+    };
     
-    if (recentNotificationsCount >= 30) { // 每分钟最多30条通知
-      return res.status(429).json(
+    // 如果提供了外部ID，添加到通知数据中（用于去重）
+    if (externalId) {
+      notificationData.externalId = externalId;
+    } else if (metadata && metadata.id) {
+      // 如果metadata中有id字段，也可以用作外部ID
+      notificationData.externalId = String(metadata.id);
+    } else {
+      // 生成一个唯一ID作为外部ID，以避免重复键错误
+      notificationData.externalId = new mongoose.Types.ObjectId().toString();
+    }
+    
+    // 创建通知
+    const notification = new Notification(notificationData);
+    await notification.save();
+    
+    // 更新订阅的最后通知时间和通知计数
+    subscription.lastNotificationAt = new Date();
+    subscription.notificationCount += 1;
+    await subscription.save();
+    
+    res.status(201).json({
+      message: '通知已成功接收',
+      notification: {
+        id: notification._id,
+        title: notification.title,
+        receivedAt: notification.receivedAt
+      }
+    });
+  } catch (error) {
+    console.error('接收通知错误:', error);
+    
+    // 处理重复键错误
+    if (error.code === 11000 && error.keyPattern && (error.keyPattern.subscriptionId || error.keyPattern.externalId)) {
+      return res.status(409).json(
         createErrorResponse(
-          '通知发送频率过高，请稍后再试', 
-          ERROR_CODES.NOTIFICATION_THROTTLED,
+          '通知已存在，请避免发送重复通知', 
+          ERROR_CODES.DUPLICATE_NOTIFICATION,
           { 
-            limit: 30,
-            period: '1分钟',
-            current: recentNotificationsCount
+            details: '通知去重失败，可能是因为未提供有效的externalId',
+            subscriptionId: error.keyValue?.subscriptionId?.toString(),
+            externalId: error.keyValue?.externalId
           },
           req.originalUrl
         )
       );
     }
-
-    // 创建通知
-    const notification = new Notification({
-      userId: user._id,
-      subscriptionId: subscription._id,
-      title,
-      content,
-      type: type || 'info',
-      priority: priority || 'normal',
-      source: source || { name: subscription.thirdPartyName },
-      metadata: metadata || {},
-      externalId,
-      callbackUrl,
-      rawData: req.body
-    });
-
-    await notification.save();
-
-    // 更新订阅统计
-    subscription.lastNotificationAt = new Date();
-    subscription.notificationCount += 1;
-    await subscription.save();
-
-    res.status(201).json({
-      message: '通知接收成功',
-      notificationId: notification._id
-    });
-  } catch (error) {
-    console.error('接收通知错误:', error);
     
-    // 区分不同类型的错误
-    if (error.name === 'ValidationError') {
-      return res.status(400).json(
-        createErrorResponse(
-          '通知数据验证失败', 
-          ERROR_CODES.DATA_VALIDATION_FAILED,
-          { details: error.message },
-          req.originalUrl
-        )
-      );
-    }
-    
-    if (error.name === 'MongoError' && error.code === 11000) {
-      return res.status(409).json(
-        createErrorResponse(
-          '重复的通知ID', 
-          ERROR_CODES.DUPLICATE_ENTRY,
-          null,
-          req.originalUrl
-        )
-      );
-    }
-    
+    // 处理其他错误
     res.status(500).json(
       createErrorResponse(
         '服务器内部错误', 

@@ -304,7 +304,22 @@ const i18n = {
                 verificationSuccess: '邮箱验证成功',
                 resendCode: '重新发送',
                 codeExpireTime: '验证码将在10分钟后过期',
-                verificationSuccessDesc: '您的邮箱已通过验证，可以接收重要的账户通知。'
+                verificationSuccessDesc: '您的邮箱已通过验证，可以接收重要的账户通知。',
+                // 我的服务相关
+                myServices: '我的服务',
+                myServicesDesc: '管理您创建的服务和订阅者',
+                noServices: '您还没有创建任何服务',
+                serviceDetails: '服务详情',
+                subscriberCount: '订阅用户数',
+                subscribers: '订阅用户',
+                serviceName: '服务名称',
+                serviceUrl: '服务地址',
+                serviceApiEndpoint: 'API接口',
+                createService: '创建服务',
+                serviceGuide: '如何将您的服务接入回声平台？',
+                serviceGuideDesc: '要将您的服务接入回声平台，需要在您的服务中实现以下接口：',
+                serviceInfoApi: '服务信息接口',
+                addOwnerNotifyId: '在服务信息中添加您的通知ID(owner_notify_id)，这样其他用户订阅您的服务后，您就可以在此处查看订阅统计。'
             }
         },
         
@@ -408,10 +423,12 @@ const i18n = {
             pollFailed: '轮询触发失败',
             unknownSource: '未知来源',
             thirdPartyService: '第三方服务',
+            systemNotification: '系统通知',
             notificationsRefreshed: '通知已刷新',
             noNotificationsToExport: '没有通知可导出',
             notificationsExported: '已导出 {count} 条通知',
-            exportFailed: '导出失败'
+            exportFailed: '导出失败',
+            deletedSubscription: '已删除的订阅'
         },
         
         // 确认对话框
@@ -714,8 +731,8 @@ const i18n = {
                 email: 'Email',
                 notifyId: 'Notify ID',
                 registerTime: 'Register Time',
-                currentCode: 'Current Code',
-                codeExpire: 'This code expires in 5 minutes, please use it promptly',
+                currentCode: 'Current Notify Code',
+                codeExpire: 'This code will expire in 5 minutes, please use it promptly',
                 storageUsage: 'Storage Usage',
                 storageUsageDesc: 'View your message and subscription data usage',
                 notificationsStorage: 'Notifications Storage',
@@ -726,7 +743,7 @@ const i18n = {
                 notifications: 'notifications',
                 subscriptions: 'subscriptions',
                 storageLimit: 'Storage Limit: 1MB',
-                // 邮箱验证相关
+                // Email verification related
                 emailVerification: 'Email Verification',
                 emailStatus: 'Email Status',
                 verified: 'Verified',
@@ -740,7 +757,22 @@ const i18n = {
                 verificationSuccess: 'Email verification successful',
                 resendCode: 'Resend',
                 codeExpireTime: 'Verification code will expire in 10 minutes',
-                verificationSuccessDesc: 'Your email has been verified, you can receive important account notifications.'
+                verificationSuccessDesc: 'Your email has been verified, you can receive important account notifications.',
+                // My services related
+                myServices: 'My Services',
+                myServicesDesc: 'Manage your created services and subscribers',
+                noServices: 'You haven\'t created any services yet',
+                serviceDetails: 'Service Details',
+                subscriberCount: 'Subscriber Count',
+                subscribers: 'Subscribers',
+                serviceName: 'Service Name',
+                serviceUrl: 'Service URL',
+                serviceApiEndpoint: 'API Endpoint',
+                createService: 'Create Service',
+                serviceGuide: 'How to integrate your service with Huisheen?',
+                serviceGuideDesc: 'To integrate your service with Huisheen, you need to implement the following APIs:',
+                serviceInfoApi: 'Service Info API',
+                addOwnerNotifyId: 'Add your Notify ID(owner_notify_id) in your service info, so you can see subscription statistics when other users subscribe to your service.'
             }
         },
         
@@ -844,10 +876,12 @@ const i18n = {
             pollFailed: 'Failed to trigger poll',
             unknownSource: 'Unknown source',
             thirdPartyService: 'Third-party service',
+            systemNotification: 'System Notification',
             notificationsRefreshed: 'Notifications refreshed',
             noNotificationsToExport: 'No notifications to export',
             notificationsExported: 'Exported {count} notifications',
-            exportFailed: 'Export failed'
+            exportFailed: 'Export failed',
+            deletedSubscription: 'Deleted subscription'
         },
         
         // Confirm dialogs

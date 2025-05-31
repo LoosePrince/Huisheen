@@ -73,7 +73,7 @@ createApp({
                 mode: ''
             },
             currentPage: 1,
-            itemsPerPage: 10,
+            itemsPerPage: 12,
             
             categories: {
                 sources: [],
@@ -111,7 +111,11 @@ createApp({
                 codeSent: false,
                 remainingTime: 0,
                 timer: null
-            }
+            },
+            
+            // 我的服务相关状态
+            myServices: [],
+            myServicesLoading: false
         };
     },
     
@@ -134,6 +138,11 @@ createApp({
         // 判断是否在文档页面
         isDocsPage() {
             return this.currentRoute.startsWith('/docs');
+        },
+        
+        // 判断用户是否已认证
+        isAuthenticated() {
+            return this.user !== null && this.token !== null;
         },
         
         // 获取当前文档类型
@@ -173,8 +182,19 @@ createApp({
         // 服务列表（去重）
         servicesList() {
             const services = new Set();
+            // 检查是否有系统通知
+            const hasSystemNotifications = this.notifications.some(notification => notification.isSystemNotification);
+            if (hasSystemNotifications) {
+                services.add(this.t.messages.systemNotification);
+            }
+            
             // 从通知数据中获取服务列表，而不是订阅数据
             this.notifications.forEach(notification => {
+                // 跳过系统通知，因为已经在上面处理了
+                if (notification.isSystemNotification) {
+                    return;
+                }
+                
                 if (notification.subscription) {
                     let serviceName = '';
                     if (notification.subscription.name) {
@@ -234,6 +254,12 @@ createApp({
             }
             if (this.filters.service) {
                 result = result.filter(n => {
+                    // 处理系统通知筛选
+                    if (this.filters.service === this.t.messages.systemNotification) {
+                        return n.isSystemNotification === true;
+                    }
+                    
+                    // 普通服务筛选
                     let serviceName = '';
                     
                     if (n.subscription) {
@@ -318,6 +344,7 @@ createApp({
         if (this.token) {
             this.loadUserData().then(() => {
                 this.initRouter();
+                this.fetchMyServices(); // 加载我的服务数据
             }).catch(() => {
                 // 如果token无效，清除并初始化路由
                 this.logout(true); // 跳过导航，避免初始化时的路由问题
@@ -570,11 +597,22 @@ createApp({
                 
                 this.showLogin = false;
                 this.loginForm = { email: '', password: '' };
-                this.showMessage(this.t.messages.loginSuccess);
+                this.showMessage(this.t.messages.loginSuccess, 'success');
                 
-                // 登录成功后跳转到用户页面
-                this.navigateTo('/user');
-                this.loadUserData();
+                // 加载完整用户数据
+                await this.loadUserData();
+                
+                // 加载通知和订阅数据
+                this.fetchNotifications();
+                this.fetchSubscriptions();
+                this.fetchCategories();
+                this.fetchMyServices(); // 加载我的服务
+                
+                // 重置登录表单
+                this.loginForm = {
+                    email: '',
+                    password: ''
+                };
             } catch (error) {
                 this.showMessage(error.response?.data?.error || this.t.messages.loginFailed, 'error');
             } finally {
@@ -663,7 +701,27 @@ createApp({
                 const url = queryString ? `/notifications?${queryString}` : '/notifications';
                 
                 const response = await axios.get(url);
-                this.notifications = response.data.notifications;
+                
+                // 确保每个通知对象都正确处理isSystemNotification标记
+                this.notifications = response.data.notifications.map(notification => {
+                    // 检查是否有明确的系统通知标记
+                    if (notification.isSystemNotification) {
+                        return notification;
+                    }
+                    
+                    // 检查是否有系统通知的特征
+                    const isSystem = 
+                        (notification.source && notification.source.name === '系统通知') ||
+                        (notification.metadata && notification.metadata.systemNotification) ||
+                        (!notification.subscriptionId && notification.source && 
+                         (notification.source.type === 'system' || 
+                          notification.source.name === '系统通知'));
+                    
+                    return {
+                        ...notification,
+                        isSystemNotification: isSystem
+                    };
+                });
             } catch (error) {
                 console.error('Failed to load notifications:', error);
             }
@@ -807,7 +865,10 @@ createApp({
                 };
                 this.servicePreview = null;
                 this.showMessage(this.t.messages.subscriptionCreated);
-                this.loadSubscriptions();
+                
+                // 重新加载订阅列表和我的服务列表
+                await this.loadSubscriptions();
+                await this.fetchMyServices();
             } catch (error) {
                 this.showMessage(error.response?.data?.error || this.t.messages.subscriptionCreateFailed, 'error');
             } finally {
@@ -823,16 +884,16 @@ createApp({
                 this.loading = true;
                 this.servicePreview = null;
                 
-                // 从API URL推导服务信息端点
-                const url = new URL(this.passiveForm.apiUrl);
-                const baseUrl = `${url.protocol}//${url.host}`;
-                const serviceInfoUrl = `${baseUrl}/api/service-info`;
+                // 使用后端代理API获取服务信息，避免CORS问题
+                const response = await axios.get('/subscriptions/preview-service', {
+                    params: { url: this.passiveForm.apiUrl }
+                });
                 
-                const response = await axios.get(serviceInfoUrl);
                 this.servicePreview = response.data;
                 this.showMessage(this.t.messages.serviceInfoFetched);
             } catch (error) {
-                this.showMessage(this.t.messages.serviceInfoFetchFailed, 'error');
+                console.error('预览服务错误详情:', error.response || error);
+                this.showMessage(error.response?.data?.error || this.t.messages.serviceInfoFetchFailed, 'error');
                 console.error('Failed to fetch service info:', error);
             } finally {
                 this.loading = false;
@@ -842,6 +903,12 @@ createApp({
         // 切换订阅状态
         async toggleSubscription(subscription) {
             try {
+                // 检查服务是否被管理员禁用
+                if (subscription.serviceStatus && subscription.serviceStatus.isActive === false) {
+                    this.showMessage('此服务已被管理员禁用，无法修改状态', 'error');
+                    return;
+                }
+                
                 await axios.patch(`/subscriptions/${subscription.id}/status`, {
                     isActive: !subscription.isActive
                 });
@@ -849,7 +916,11 @@ createApp({
                 const statusText = subscription.isActive ? this.t.user.subscriptions.status.enabled : this.t.user.subscriptions.status.disabled;
                 this.showMessage(`${this.t.messages.subscriptionToggled} - ${statusText}`);
             } catch (error) {
+                if (error.response?.status === 403 && error.response.data?.error?.data?.reason === 'service_disabled') {
+                    this.showMessage('此服务已被管理员禁用，无法修改状态', 'error');
+                } else {
                 this.showMessage(error.response?.data?.error || this.t.messages.operationFailed, 'error');
+                }
             }
         },
         
@@ -1079,6 +1150,12 @@ createApp({
         // 手动触发被动轮询
         async triggerPassivePoll(subscription) {
             try {
+                // 检查服务是否被管理员禁用
+                if (subscription.serviceStatus && subscription.serviceStatus.isActive === false) {
+                    this.showMessage('此服务已被管理员禁用，无法进行轮询', 'error');
+                    return;
+                }
+                
                 this.pollingTriggers.set(subscription.id, { loading: true });
                 
                 const response = await axios.post(`/subscriptions/${subscription.id}/trigger-poll`);
@@ -1105,7 +1182,9 @@ createApp({
             } catch (error) {
                 this.pollingTriggers.set(subscription.id, { loading: false });
                 
-                if (error.response?.status === 429) {
+                if (error.response?.status === 403 && error.response.data?.error?.data?.reason === 'service_disabled') {
+                    this.showMessage('此服务已被管理员禁用，无法进行轮询', 'error');
+                } else if (error.response?.status === 429) {
                     const remainingSeconds = error.response.data.remainingSeconds;
                     this.showMessage(this.getText('messages.pollCooldown', { seconds: remainingSeconds }), 'error');
                     
@@ -1390,6 +1469,19 @@ createApp({
         
         // 格式化来源显示
         formatSource(source) {
+            // 如果通知本身是系统通知，直接返回系统通知文本
+            if (arguments[1] && arguments[1].isSystemNotification) {
+                return this.t.messages.systemNotification;
+            }
+            
+            // 处理系统通知源标记
+            if (source === 'system' || 
+                (typeof source === 'object' && source.type === 'system') || 
+                (typeof source === 'object' && source.name === '系统通知') ||
+                (typeof source === 'string' && source.includes('system'))) {
+                return this.t.messages.systemNotification;
+            }
+            
             if (!source) return this.t.messages.unknownSource;
             
             // 如果是字符串，直接返回
@@ -1677,6 +1769,44 @@ createApp({
                 if (sectionId) {
                     this.scrollToSection(sectionId);
                 }
+            }
+        },
+        
+        // 获取我的服务列表
+        async fetchMyServices() {
+            if (!this.isAuthenticated) return;
+            
+            this.myServicesLoading = true;
+            try {
+                const response = await axios.get('/subscriptions/my-services');
+                this.myServices = response.data.myServices || [];
+            } catch (error) {
+                console.error('获取我的服务失败:', error);
+                this.showMessage(this.t.messages.unknownError, 'error');
+            } finally {
+                this.myServicesLoading = false;
+            }
+        },
+        
+        // 添加或修改refreshData方法
+        async refreshData() {
+            if (!this.isAuthenticated) return;
+            
+            this.loading = true;
+            try {
+                await Promise.all([
+                    this.fetchNotifications(),
+                    this.fetchSubscriptions(),
+                    this.fetchCategories(),
+                    this.fetchMyServices() // 加载我的服务
+                ]);
+                
+                this.showMessage(this.t.messages.notificationsRefreshed, 'success');
+            } catch (error) {
+                console.error('刷新数据错误:', error);
+                this.showMessage(this.t.messages.unknownError, 'error');
+            } finally {
+                this.loading = false;
             }
         }
     }

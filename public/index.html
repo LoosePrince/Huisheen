@@ -919,7 +919,25 @@
                                         </div>
                                         <div class="flex items-center">
                                             <i class="fas fa-tag mr-1"></i>
-                                            <span class="truncate">{{ formatSource(notification.source) }}</span>
+                                            <span class="truncate">
+                                                <!-- 系统通知 -->
+                                                <template v-if="notification.isSystemNotification">
+                                                    <i class="fas fa-bell text-purple-500 dark:text-purple-400 mr-1"></i>
+                                                    {{ t.messages.systemNotification }}
+                                                </template>
+                                                <!-- 来自订阅的通知 -->
+                                                <template v-else-if="notification.subscription">
+                                                    {{ notification.subscription.name || t.messages.thirdPartyService }}
+                                                </template>
+                                                <!-- 来自source的通知 -->
+                                                <template v-else-if="notification.source && notification.source.name">
+                                                    {{ notification.source.name }}
+                                                </template>
+                                                <!-- 其他通知 -->
+                                                <template v-else>
+                                                    {{ t.messages.unknownSource }}
+                                                </template>
+                                            </span>
                                         </div>
                                     </div>
                                     
@@ -1031,6 +1049,11 @@
                                                       class="px-2 py-1 text-xs rounded-full">
                                                     {{ subscription.isActive ? t.user.subscriptions.status.enabled : t.user.subscriptions.status.disabled }}
                                                 </span>
+                                                <!-- 服务状态标签 -->
+                                                <span v-if="subscription.serviceStatus && !subscription.serviceStatus.isActive" 
+                                                      class="px-2 py-1 text-xs rounded-full bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200">
+                                                    服务暂停
+                                                </span>
                                             </div>
                                         <p class="text-gray-600 dark:text-gray-300 text-sm mb-2">{{ subscription.thirdPartyUrl }}</p>
                                         <div class="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
@@ -1046,17 +1069,26 @@
                                         </div>
                                         <div class="flex space-x-2 ml-4">
                                             <button @click="toggleSubscription(subscription)" 
-                                                :class="subscription.isActive ? 'text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300' : 'text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300'"
-                                                    class="transition">
+                                                :class="[
+                                                    subscription.isActive ? 'text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300' : 'text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300',
+                                                    (subscription.serviceStatus && !subscription.serviceStatus.isActive) ? 'opacity-50 cursor-not-allowed' : ''
+                                                ]"
+                                                :disabled="subscription.serviceStatus && !subscription.serviceStatus.isActive"
+                                                :title="(subscription.serviceStatus && !subscription.serviceStatus.isActive) ? '服务已被管理员禁用' : (subscription.isActive ? '暂停' : '启用')"
+                                                class="transition">
                                                 <i :class="subscription.isActive ? 'fas fa-pause' : 'fas fa-play'"></i>
                                             </button>
                                             <button v-if="subscription.mode === 'passive' && subscription.isActive" 
                                                     @click="triggerPassivePoll(subscription)"
-                                                    :disabled="isSubscriptionInCooldown(subscription.id)"
-                                                    :title="isSubscriptionInCooldown(subscription.id) ? 
+                                                    :disabled="isSubscriptionInCooldown(subscription.id) || (subscription.serviceStatus && !subscription.serviceStatus.isActive)"
+                                                    :title="(subscription.serviceStatus && !subscription.serviceStatus.isActive) ? '服务已被管理员禁用' :
+                                                            (isSubscriptionInCooldown(subscription.id) ? 
                                                             `冷却中，剩余 ${getSubscriptionCooldownRemaining(subscription.id)} 秒` : 
-                                                            '立即轮询'"
-                                                class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition disabled:text-gray-400 dark:disabled:text-gray-600 disabled:cursor-not-allowed">
+                                                            '立即轮询')"
+                                                :class="[
+                                                    'text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition disabled:text-gray-400 dark:disabled:text-gray-600 disabled:cursor-not-allowed',
+                                                    (subscription.serviceStatus && !subscription.serviceStatus.isActive) ? 'opacity-50' : ''
+                                                ]">
                                                 <i v-if="isSubscriptionLoading(subscription.id)" class="fas fa-spinner fa-spin"></i>
                                                 <i v-else class="fas fa-sync-alt"></i>
                                             </button>
@@ -1072,29 +1104,46 @@
 
                     <!-- 账户设置 -->
                     <div v-if="currentTab === 'settings'" class="p-4 md:p-6">
-                            <div>
+                        <div>
                             <h3 class="text-lg font-medium mb-4 text-gray-900 dark:text-white">{{ t.user.settings.title }}</h3>
                             <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg theme-transition">
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div>
-                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t.user.settings.username }}</label>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">{{t.user.settings.username }}</label>
                                         <p class="mt-1 text-sm text-gray-900 dark:text-white">{{ user.username }}</p>
-                                        </div>
-                                        <div>
-                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t.user.settings.email }}</label>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t.user.settings.email}}</label>
                                         <p class="mt-1 text-sm text-gray-900 dark:text-white">{{ user.email }}</p>
-                                        </div>
-                                        <div>
-                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t.user.settings.notifyId }}</label>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">{{t.user.settings.notifyId }}</label>
                                         <p class="mt-1 text-sm text-gray-900 dark:text-white font-mono">{{ user.notifyId }}</p>
-                                        </div>
-                                        <div>
-                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t.user.settings.registerTime }}</label>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">{{t.user.settings.registerTime }}</label>
                                         <p class="mt-1 text-sm text-gray-900 dark:text-white">{{ formatDate(user.createdAt) }}</p>
-                                        </div>
                                     </div>
                                 </div>
                             </div>
+                        </div>
+
+                        <!-- 通知标识码 -->
+                        <div v-if="notifyCode">
+                            <h3 class="text-lg font-medium mb-4 text-gray-900 dark:text-white">{{ t.user.settings.currentCode }}</h3>
+                            <div class="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 p-4 rounded-lg theme-transition">
+                                <div class="flex items-center justify-between">
+                                    <code class="text-sm font-mono bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 rounded border dark:border-gray-600">{{ notifyCode }}</code>
+                                    <button @click="copyToClipboard(notifyCode)" 
+                                        class="bg-blue-500 dark:bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-600 dark:hover:bg-blue-700 transition">
+                                        <i class="fas fa-copy mr-2"></i>{{ t.common.copy }}
+                                    </button>
+                                </div>
+                                <p class="text-sm text-blue-700 dark:text-blue-300 mt-2">
+                                    <i class="fas fa-clock mr-1"></i>{{ t.user.settings.codeExpire }}
+                                </p>
+                            </div>
+                        </div>
 
                         <!-- 邮箱验证 -->
                         <div v-if="user" class="mt-6">
@@ -1299,19 +1348,76 @@
                             </div>
                         </div>
 
-                            <div v-if="notifyCode">
-                            <h3 class="text-lg font-medium mb-4 text-gray-900 dark:text-white">{{ t.user.settings.currentCode }}</h3>
-                            <div class="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 p-4 rounded-lg theme-transition">
-                                    <div class="flex items-center justify-between">
-                                    <code class="text-sm font-mono bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 rounded border dark:border-gray-600">{{ notifyCode }}</code>
-                                        <button @click="copyToClipboard(notifyCode)" 
-                                            class="bg-blue-500 dark:bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-600 dark:hover:bg-blue-700 transition">
-                                            <i class="fas fa-copy mr-2"></i>{{ t.common.copy }}
-                                        </button>
+                        <!-- 我的服务 -->
+                        <div v-if="user" class="mt-6">
+                            <h3 class="text-lg font-medium mb-4 text-gray-900 dark:text-white">{{ t.user.settings.myServices }}</h3>
+                            <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg theme-transition">
+                                <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">{{ t.user.settings.myServicesDesc }}</p>
+                                
+                                <!-- 加载状态 -->
+                                <div v-if="myServicesLoading" class="flex justify-center py-6">
+                                    <i class="fas fa-spinner fa-spin text-blue-500 text-2xl"></i>
+                                </div>
+                                
+                                <!-- 服务列表 -->
+                                <div v-else-if="myServices && myServices.length > 0" class="space-y-4">
+                                    <div v-for="service in myServices" :key="service.id" 
+                                         class="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-600 theme-transition">
+                                        <div class="flex items-center justify-between mb-2">
+                                            <div class="font-medium text-gray-900 dark:text-white flex items-center">
+                                                <i class="fas fa-server text-blue-500 mr-2"></i>
+                                                {{ service.name }}
+                                            </div>
+                                            <div class="text-sm bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 px-3 py-1 rounded-full">
+                                                {{ service.subscriberCount }} {{ t.user.settings.subscribers }}
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="text-sm text-gray-600 dark:text-gray-400 mb-3 truncate">
+                                            <a :href="service.url" target="_blank" class="hover:text-blue-500 transition">
+                                                <i class="fas fa-link mr-1"></i>{{ service.url }}
+                                            </a>
+                                        </div>
+                                        
+                                        <!-- 服务详情 -->
+                                        <div class="mt-2 space-y-2 text-sm">
+                                            <div v-if="service.apiEndpoint" class="text-gray-600 dark:text-gray-400">
+                                                <span class="font-medium">{{ t.user.settings.serviceApiEndpoint }}:</span>
+                                                <span class="ml-1 font-mono">{{ service.apiEndpoint }}</span>
+                                            </div>
+                                        </div>
                                     </div>
-                                <p class="text-sm text-blue-700 dark:text-blue-300 mt-2">
-                                        <i class="fas fa-clock mr-1"></i>{{ t.user.settings.codeExpire }}
-                                    </p>
+                                </div>
+                                
+                                <!-- 无服务提示 -->
+                                <div v-else class="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 p-4 rounded-lg">
+                                    <div class="flex items-start">
+                                        <i class="fas fa-info-circle text-blue-500 mt-0.5 mr-2 flex-shrink-0"></i>
+                                        <div>
+                                            <h4 class="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
+                                                {{ t.user.settings.noServices }}
+                                            </h4>
+                                            <p class="text-sm text-blue-700 dark:text-blue-300 mb-3">
+                                                {{ t.user.settings.serviceGuide }}
+                                            </p>
+                                            <div class="text-xs text-blue-700 dark:text-blue-300">
+                                                <p class="mb-2">{{ t.user.settings.serviceGuideDesc }}</p>
+                                                <div class="bg-white dark:bg-gray-800 p-3 rounded-lg border border-blue-200 dark:border-blue-700 my-2 font-mono">
+                                                    GET /api/service-info
+                                                </div>
+                                                <pre class="bg-white dark:bg-gray-800 p-3 rounded-lg border border-blue-200 dark:border-blue-700 my-2 font-mono">
+{
+    "name": "我的服务",
+    "description": "服务描述",
+    "version": "1.0.0",
+    "api_endpoint": "https://myservice.com/api/notifications",
+    "owner_notify_id": "{{ user.notifyId }}"
+}</pre>
+                                                <p>{{ t.user.settings.addOwnerNotifyId }}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1650,18 +1756,52 @@
                     <div>
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ t.notificationDetail.source }}</label>
                                 <div class="bg-gray-50 dark:bg-gray-700 p-3 rounded theme-transition">
-                            <div class="flex items-center space-x-2 mb-2">
-                                        <i class="fas fa-tag text-gray-500 dark:text-gray-400"></i>
-                                        <span class="font-medium text-gray-900 dark:text-white">{{ selectedNotification.subscription.name }}</span>
-                                        <span class="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded">
+                            <!-- 系统通知 -->
+                            <div v-if="selectedNotification.isSystemNotification" class="flex items-center space-x-2 mb-2">
+                                <i class="fas fa-bell text-purple-500 dark:text-purple-400"></i>
+                                <span class="font-medium text-gray-900 dark:text-white">
+                                    {{ selectedNotification.source && selectedNotification.source.name || t.messages.systemNotification }}
+                                </span>
+                                <span class="text-xs px-2 py-1 bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 rounded">
+                                    {{ t.messages.systemNotification }}
+                                </span>
+                            </div>
+                            <!-- 普通订阅通知 -->
+                            <div v-else-if="selectedNotification.subscription" class="flex items-center space-x-2 mb-2">
+                                <i class="fas fa-tag text-gray-500 dark:text-gray-400"></i>
+                                <span class="font-medium text-gray-900 dark:text-white">{{ selectedNotification.subscription.name }}</span>
+                                <span class="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded">
                                     {{ selectedNotification.subscription.mode === 'active' ? t.user.notifications.filters.activeMode : t.user.notifications.filters.passiveMode }}
                                 </span>
                             </div>
-                                    <div class="text-sm text-gray-600 dark:text-gray-300">
+                            <!-- 其他来源通知 -->
+                            <div v-else-if="selectedNotification.source" class="flex items-center space-x-2 mb-2">
+                                <i class="fas fa-tag text-gray-500 dark:text-gray-400"></i>
+                                <span class="font-medium text-gray-900 dark:text-white">
+                                    {{ selectedNotification.source.name || t.messages.unknownSource }}
+                                </span>
+                            </div>
+                            <!-- 无来源信息 -->
+                            <div v-else class="flex items-center space-x-2 mb-2">
+                                <i class="fas fa-question-circle text-gray-500 dark:text-gray-400"></i>
+                                <span class="font-medium text-gray-900 dark:text-white">
+                                    {{ t.messages.unknownSource }}
+                                </span>
+                            </div>
+                            
+                            <!-- 链接信息 - 只在有URL时显示 -->
+                            <div v-if="selectedNotification.subscription && selectedNotification.subscription.url" class="text-sm text-gray-600 dark:text-gray-300">
                                 <i class="fas fa-link mr-1"></i>
                                 <a :href="selectedNotification.subscription.url" target="_blank" 
-                                           class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline">
+                                   class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline">
                                     {{ selectedNotification.subscription.url }}
+                                </a>
+                            </div>
+                            <div v-else-if="selectedNotification.source && selectedNotification.source.url" class="text-sm text-gray-600 dark:text-gray-300">
+                                <i class="fas fa-link mr-1"></i>
+                                <a :href="selectedNotification.source.url" target="_blank" 
+                                   class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline">
+                                    {{ selectedNotification.source.url }}
                                 </a>
                             </div>
                         </div>

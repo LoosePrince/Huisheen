@@ -9,7 +9,11 @@ const notificationSchema = new mongoose.Schema({
   subscriptionId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Subscription',
-    required: true
+    required: false
+  },
+  isSystemNotification: {
+    type: Boolean,
+    default: false
   },
   title: {
     type: String,
@@ -68,7 +72,8 @@ const notificationSchema = new mongoose.Schema({
   // 用于去重
   externalId: {
     type: String,
-    trim: true
+    trim: true,
+    default: () => new mongoose.Types.ObjectId().toString() // 默认生成唯一ID
   },
   // 第三方原始数据
   rawData: {
@@ -89,5 +94,6 @@ notificationSchema.methods.markAsRead = function() {
 notificationSchema.index({ subscriptionId: 1, externalId: 1 }, { unique: true, sparse: true });
 notificationSchema.index({ userId: 1, receivedAt: -1 });
 notificationSchema.index({ userId: 1, isRead: 1, receivedAt: -1 });
+notificationSchema.index({ isSystemNotification: 1, userId: 1, receivedAt: -1 }); // 系统通知索引
 
 module.exports = mongoose.model('Notification', notificationSchema); 

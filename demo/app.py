@@ -602,22 +602,32 @@ def send_notification():
                     )
                     
                     if verify_response.status_code not in [200, 201]:
-                        error_msg = f"验证通知标识码失败: {verify_response.status_code}"
                         try:
                             error_detail = verify_response.json()
-                            error_msg += f" - {error_detail.get('error', '')}"
-                            if 'details' in error_detail:
-                                details = error_detail['details']
-                                error_msg += f"\n详细错误: {json.dumps(details, ensure_ascii=False, indent=2)}"
+                            error_message = error_detail.get('error', '未知错误')
+                            error_code = error_detail.get('code', 'UNKNOWN_ERROR')
+                            error_details = error_detail.get('details', {})
+                            
+                            logger.error(f"验证通知标识码失败: {verify_response.status_code} - {error_message}")
+                            
+                            return jsonify({
+                                'success': False,
+                                'error': error_message,
+                                'error_code': error_code,
+                                'error_details': error_details,
+                                'step': 'verify_notify_code',
+                                'status_code': verify_response.status_code
+                            }), verify_response.status_code  # 保留原始状态码
                         except:
-                            error_msg += f" - {verify_response.text}"
-                        
-                        logger.error(error_msg)
-                        return jsonify({
-                            'success': False,
-                            'error': error_msg,
-                            'step': 'verify_notify_code'
-                        }), 400
+                            error_msg = f"验证通知标识码失败: {verify_response.status_code} - {verify_response.text}"
+                            logger.error(error_msg)
+                            
+                            return jsonify({
+                                'success': False,
+                                'error': error_msg,
+                                'step': 'verify_notify_code',
+                                'status_code': verify_response.status_code
+                            }), verify_response.status_code  # 保留原始状态码
                         
                     verify_result = verify_response.json()
                     token = verify_result.get('token')
@@ -686,48 +696,63 @@ def send_notification():
         logger.info(f"发送通知: {send_url}")
         logger.info(f"通知数据: {json.dumps(notification_data, ensure_ascii=False, indent=2)}")
         
-        send_response = requests.post(
-            send_url,
-            json=notification_data,
-            headers={'Content-Type': 'application/json'},
-            timeout=10
-        )
-        
-        if send_response.status_code in [200, 201]:
-            result = send_response.json()
-            logger.info(f"通知发送成功: {result}")
+        try:
+            send_response = requests.post(
+                send_url,
+                json=notification_data,
+                headers={'Content-Type': 'application/json'},
+                timeout=10
+            )
             
-            return jsonify({
-                'success': True,
-                'message': '通知已成功发送到回声平台',
-                'verify_result': verify_result,
-                'send_result': result,
-                'notify_id': notify_id,
-                'used_saved_token': data.get('use_saved_token', False)
-            })
-        else:
-            error_msg = f"发送通知失败: {send_response.status_code}"
-            try:
-                error_detail = send_response.json()
-                error_msg += f" - {error_detail.get('error', '')}"
-            except:
-                error_msg += f" - {send_response.text}"
-            
+            if send_response.status_code in [200, 201]:
+                result = send_response.json()
+                logger.info(f"通知发送成功: {result}")
+                
+                return jsonify({
+                    'success': True,
+                    'message': '通知已成功发送到回声平台',
+                    'verify_result': verify_result,
+                    'send_result': result,
+                    'notify_id': notify_id,
+                    'used_saved_token': data.get('use_saved_token', False)
+                })
+            else:
+                try:
+                    error_detail = send_response.json()
+                    error_message = error_detail.get('error', '未知错误')
+                    error_code = error_detail.get('code', 'UNKNOWN_ERROR')
+                    error_details = error_detail.get('details', {})
+                    
+                    logger.error(f"发送通知失败: {send_response.status_code} - {error_message}")
+                    
+                    return jsonify({
+                        'success': False,
+                        'error': error_message,
+                        'error_code': error_code,
+                        'error_details': error_details,
+                        'step': 'send_notification',
+                        'status_code': send_response.status_code
+                    }), send_response.status_code  # 保留原始状态码
+                except:
+                    error_msg = f"发送通知失败: {send_response.status_code} - {send_response.text}"
+                    logger.error(error_msg)
+                    
+                    return jsonify({
+                        'success': False,
+                        'error': error_msg,
+                        'step': 'send_notification',
+                        'status_code': send_response.status_code
+                    }), send_response.status_code  # 保留原始状态码
+                
+        except requests.exceptions.RequestException as e:
+            error_msg = f"无法连接到回声平台: {str(e)}"
             logger.error(error_msg)
             return jsonify({
                 'success': False,
                 'error': error_msg,
                 'step': 'send_notification',
-                'status_code': send_response.status_code
-            }), 500
-            
-    except requests.exceptions.RequestException as e:
-        error_msg = f"无法连接到回声平台: {str(e)}"
-        logger.error(error_msg)
-        return jsonify({
-            'success': False,
-            'error': error_msg
-        }), 503
+                'status_code': 503
+            }), 503
         
     except Exception as e:
         logger.error(f"发送通知失败: {str(e)}")
@@ -1061,7 +1086,8 @@ def service_info():
         'api_endpoint': f'{DEMO_BASE_URL}/api/notifications',
         'supported_features': ['notifications', 'polling', 'webhooks'],
         'notification_types': ['info', 'warning', 'error', 'success'],
-        'priority_levels': ['low', 'normal', 'high', 'urgent']
+        'priority_levels': ['low', 'normal', 'high', 'urgent'],
+        'owner_notify_id': '8397-fb3c-154e'
     })
 
 # ============ 示例回调页面 ============
