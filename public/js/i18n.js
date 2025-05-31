@@ -65,7 +65,7 @@ const i18n = {
                 features: {
                     free: {
                         title: '完全免费',
-                        desc: '无需付费，无使用限制，永久免费使用所有功能'
+                        desc: '无需付费，永久免费使用所有功能'
                     },
                     opensource: {
                         title: '开源透明',
@@ -501,7 +501,7 @@ const i18n = {
                 features: {
                     free: {
                         title: 'Completely Free',
-                        desc: 'No payment required, no usage restrictions, permanent free access to all features'
+                        desc: 'No payment required, permanent free access to all features'
                     },
                     opensource: {
                         title: 'Open & Transparent',

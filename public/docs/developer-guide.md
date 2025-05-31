@@ -54,6 +54,14 @@ Content-Type: application/json
 }
 ```
 
+**参数说明**:
+
+| 参数 | 类型 | 必需 | 说明 |
+|------|------|------|------|
+| `notifyCode` | string | ✅ | 用户通知标识码 (格式: notify:user:xxxx-xxxx-xxxx:xxxx@huisheen.com) |
+| `thirdPartyName` | string | ✅ | 第三方应用名称 (2-50字符) |
+| `thirdPartyUrl` | string | ✅ | 第三方应用URL (必须是有效的HTTPS URL) |
+
 **响应**:
 ```json
 {
@@ -67,9 +75,23 @@ Content-Type: application/json
 }
 ```
 
+**响应参数说明**:
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `message` | string | 操作结果描述 |
+| `token` | string | JWT格式的访问令牌，用于后续API调用验证 |
+| `userInfo` | object | 用户信息对象 |
+| `userInfo.notifyId` | string | 用户通知ID，用于推送通知 |
+| `userInfo.username` | string | 用户名称 |
+| `expiresIn` | string | Token有效期 |
+
 #### 2. 订阅Token认证
 
 用于第三方应用主动推送通知，基于订阅验证机制。
+
+**Token有效期**: 90天
+**更新机制**: 订阅Token可通过`/api/subscriptions/refresh`接口更新
 
 ### 🔄 通知推送模式
 
@@ -89,6 +111,16 @@ Content-Type: application/json
 }
 ```
 
+**参数说明**:
+
+| 参数 | 类型 | 必需 | 说明 |
+|------|------|------|------|
+| `notifyCode` | string | ✅ | 用户通知标识码 (格式: notify:user:xxxx-xxxx-xxxx:xxxx@huisheen.com) |
+| `thirdPartyName` | string | ✅ | 第三方服务名称 (2-50字符) |
+| `thirdPartyUrl` | string | ✅ | 第三方服务URL (必须是有效的HTTPS URL) |
+| `description` | string | ❌ | 服务描述 (最多200字符) |
+| `iconUrl` | string | ❌ | 服务图标URL (必须是有效的图片URL) |
+
 **响应**:
 ```json
 {
@@ -102,6 +134,18 @@ Content-Type: application/json
   }
 }
 ```
+
+**响应参数说明**:
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `message` | string | 操作结果描述 |
+| `token` | string | 订阅Token，用于推送通知时的身份验证 |
+| `subscription` | object | 订阅信息对象 |
+| `subscription.id` | string | 订阅唯一标识 |
+| `subscription.thirdPartyName` | string | 第三方服务名称 |
+| `subscription.mode` | string | 订阅模式，值为"active"表示主动推送模式 |
+| `subscription.subscribedAt` | string | ISO8601格式的订阅创建时间 |
 
 ##### 推送通知接口
 
@@ -138,12 +182,32 @@ Content-Type: application/json
 | `token` | string | ✅ | 订阅Token |
 | `title` | string | ✅ | 通知标题 (1-200字符) |
 | `content` | string | ✅ | 通知内容 (1-2000字符) |
-| `type` | string | ❌ | 通知类型: `info`/`success`/`warning`/`error` |
-| `priority` | string | ❌ | 优先级: `low`/`normal`/`high`/`urgent` |
-| `source` | object | ❌ | 来源信息 |
-| `metadata` | object | ❌ | 额外元数据 |
-| `externalId` | string | ❌ | 外部唯一ID (防重复推送) |
-| `callbackUrl` | string | ❌ | 回调链接 |
+| `type` | string | ❌ | 通知类型: `info`(默认)/`success`/`warning`/`error` |
+| `priority` | string | ❌ | 优先级: `low`/`normal`(默认)/`high`/`urgent` |
+| `source` | object | ❌ | 来源信息 (见下表) |
+| `metadata` | object | ❌ | 额外元数据 (键值对，最多10个键) |
+| `externalId` | string | ❌ | 外部唯一ID (最多100字符，用于防重复推送) |
+| `callbackUrl` | string | ❌ | 回调链接 (必须是有效的HTTPS URL) |
+| `imageUrl` | string | ❌ | 通知附带图片URL (必须是有效的图片URL) |
+| `actions` | array | ❌ | 可点击操作按钮 (最多3个) |
+
+**source对象参数**:
+
+| 参数 | 类型 | 必需 | 说明 |
+|------|------|------|------|
+| `name` | string | ✅ | 来源名称 (1-50字符) |
+| `url` | string | ❌ | 来源URL (必须是有效的HTTPS URL) |
+| `icon` | string | ❌ | 来源图标URL (必须是有效的图片URL) |
+
+**actions数组项参数**:
+
+| 参数 | 类型 | 必需 | 说明 |
+|------|------|------|------|
+| `label` | string | ✅ | 按钮文本 (1-20字符) |
+| `url` | string | ✅ | 点击跳转URL (必须是有效的HTTPS URL) |
+| `type` | string | ❌ | 按钮类型: `primary`(默认)/`secondary`/`danger` |
+
+**限流规则**: 每个订阅每分钟最多发送30条通知，每天最多1000条
 
 **响应**:
 ```json
@@ -152,6 +216,14 @@ Content-Type: application/json
   "notificationId": "507f1f77bcf86cd799439014"
 }
 ```
+
+**响应参数说明**:
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `message` | string | 操作结果描述 |
+| `notificationId` | string | 创建的通知唯一ID |
+| `receivedAt` | string | ISO8601格式的通知接收时间（可选） |
 
 #### 被动推送模式 (轮询)
 
@@ -164,7 +236,7 @@ Content-Type: application/json
 1. 登录回声平台
 2. 进入"订阅管理"页面
 3. 点击"添加被动订阅"
-4. 输入第三方服务的API地址: `https://myservice.com/api/notifications`
+4. 输入第三方服务的API地址: `https://huisheen.xzt.plus/api/notifications`
 5. 系统会自动获取服务信息并创建订阅
 
 创建成功后，回声平台将定期轮询您的API端点获取新通知。
@@ -174,6 +246,8 @@ Content-Type: application/json
 您的服务需要提供以下接口：
 
 **通知数据接口** - **GET** `/api/notifications`
+
+**响应格式**:
 ```json
 {
   "notifications": [
@@ -194,6 +268,20 @@ Content-Type: application/json
 }
 ```
 
+**响应字段说明**:
+
+| 参数 | 类型 | 必需 | 说明 |
+|------|------|------|------|
+| `id` | string | ✅ | 通知唯一ID (最多100字符) |
+| `title` | string | ✅ | 通知标题 (1-200字符) |
+| `content` | string | ✅ | 通知内容 (1-2000字符) |
+| `type` | string | ❌ | 通知类型: `info`(默认)/`success`/`warning`/`error` |
+| `priority` | string | ❌ | 优先级: `low`/`normal`(默认)/`high`/`urgent` |
+| `timestamp` | string | ✅ | ISO8601格式的时间戳 |
+| `callback_url` | string | ❌ | 详情链接 (必须是有效的HTTPS URL) |
+| `metadata` | object | ❌ | 额外元数据 (键值对，最多10个键) |
+| `image_url` | string | ❌ | 通知附带图片URL (必须是有效的图片URL) |
+
 **服务信息接口** - **GET** `/api/service-info` (可选)
 ```json
 {
@@ -205,6 +293,18 @@ Content-Type: application/json
   "api_endpoint": "https://myservice.com/api/notifications"
 }
 ```
+
+**响应参数说明**:
+
+| 参数 | 类型 | 必需 | 说明 |
+|------|------|------|------|
+| `name` | string | ✅ | 服务名称 |
+| `description` | string | ❌ | 服务描述 |
+| `version` | string | ❌ | 服务版本号 |
+| `provider` | string | ❌ | 服务提供商名称 |
+| `polling_interval` | number | ❌ | 建议的轮询间隔（分钟） |
+| `api_endpoint` | string | ✅ | 通知数据获取接口完整URL |
+| `icon_url` | string | ❌ | 服务图标URL |
 
 ##### 手动触发轮询
 
@@ -222,10 +322,20 @@ Authorization: Bearer <外部API Token>
 ```
 
 **查询参数**:
-- `limit`: 返回数量 (1-100，默认20)
-- `type`: 通知类型筛选
-- `priority`: 优先级筛选  
-- `since`: 获取指定时间之后的通知
+
+| 参数 | 类型 | 必需 | 说明 | 实现状态 |
+|------|------|------|------|---------|
+| `limit` | number | ❌ | 返回数量 (1-100，默认20) | ✅ 已实现 |
+| `type` | string | ❌ | 通知类型筛选: `info`/`success`/`warning`/`error` | ✅ 已实现 |
+| `priority` | string | ❌ | 优先级筛选: `low`/`normal`/`high`/`urgent` | ✅ 已实现 |
+| `since` | string | ❌ | ISO8601格式时间，获取指定时间之后的通知 | ✅ 已实现 |
+| `offset` | number | ❌ | 分页偏移量 (默认0) | ⚠️ 计划实现 |
+| `search` | string | ❌ | 搜索关键词 (最少2字符) | ⚠️ 计划实现 |
+| `readStatus` | string | ❌ | 读取状态: `read`/`unread`/`all`(默认unread) | ⚠️ 计划实现，当前仅返回未读通知 |
+| `sortBy` | string | ❌ | 排序字段: `receivedAt`/`priority` (默认receivedAt) | ⚠️ 计划实现，当前按接收时间倒序排列 |
+| `sortOrder` | string | ❌ | 排序方式: `asc`/`desc` (默认desc) | ⚠️ 计划实现，当前固定为desc |
+
+> 注意：当前实现默认只返回未读通知，未来将支持通过`readStatus`参数控制。
 
 **响应**:
 ```json
@@ -261,12 +371,40 @@ Authorization: Bearer <外部API Token>
 }
 ```
 
+**响应参数说明**:
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `success` | boolean | 请求是否成功 |
+| `data` | object | 返回数据对象 |
+| `data.notifications` | array | 通知列表 |
+| `data.notifications[].id` | string | 通知唯一ID |
+| `data.notifications[].title` | string | 通知标题 |
+| `data.notifications[].content` | string | 通知内容 |
+| `data.notifications[].type` | string | 通知类型 |
+| `data.notifications[].priority` | string | 通知优先级 |
+| `data.notifications[].receivedAt` | string | ISO8601格式的接收时间 |
+| `data.notifications[].source` | string | 通知来源名称 |
+| `data.notifications[].callbackUrl` | string | 通知详情链接 |
+| `data.notifications[].metadata` | object | 通知元数据 |
+| `data.notifications[].subscription` | object | 关联的订阅信息 |
+| `data.pagination` | object | 分页信息 |
+| `data.pagination.returned` | number | 本次返回的通知数量 |
+| `data.pagination.totalUnread` | number | 未读通知总数 |
+| `data.pagination.limit` | number | 请求的每页限制 |
+
 #### 标记通知已读
 
 **PATCH** `/api/external/notifications/:id/read`
 ```bash
 Authorization: Bearer <外部API Token>
 ```
+
+**路径参数**:
+
+| 参数 | 类型 | 必需 | 说明 |
+|------|------|------|------|
+| `id` | string | ✅ | 通知ID |
 
 **响应**:
 ```json
@@ -281,12 +419,33 @@ Authorization: Bearer <外部API Token>
 }
 ```
 
+**响应参数说明**:
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `success` | boolean | 请求是否成功 |
+| `message` | string | 操作结果描述 |
+| `notification` | object | 已更新的通知对象 |
+| `notification.id` | string | 通知唯一ID |
+| `notification.isRead` | boolean | 通知的已读状态，值为true |
+| `notification.readAt` | string | ISO8601格式的标记已读时间 |
+
 #### 批量标记已读
 
 **PATCH** `/api/external/notifications/batch/read`
 ```bash
 Authorization: Bearer <外部API Token>
 ```
+
+**请求体参数**:
+
+| 参数 | 类型 | 必需 | 说明 | 实现状态 |
+|------|------|------|------|---------|
+| `notificationIds` | array | ✅ | 通知ID数组 (最多100个ID) | ✅ 已实现 |
+| `markAll` | boolean | ❌ | 是否标记所有通知为已读 (设为true时忽略notificationIds) | ⚠️ 计划实现 |
+| `beforeDate` | string | ❌ | ISO8601格式时间，标记此时间之前的所有通知为已读 | ⚠️ 计划实现 |
+
+> 注意：当前仅支持通过`notificationIds`数组指定要标记的通知，`markAll`和`beforeDate`功能尚未实现。
 
 ```json
 {
@@ -307,12 +466,31 @@ Authorization: Bearer <外部API Token>
 }
 ```
 
+**响应参数说明**:
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `success` | boolean | 请求是否成功 |
+| `message` | string | 操作结果描述 |
+| `modifiedCount` | number | 实际标记为已读的通知数量 |
+| `totalRequested` | number | 请求标记的通知总数 |
+| `failedIds` | array | 操作失败的通知ID列表（可选） |
+
 #### 获取统计信息
 
 **GET** `/api/external/stats`
 ```bash
 Authorization: Bearer <外部API Token>
 ```
+
+**查询参数**:
+
+| 参数 | 类型 | 必需 | 说明 | 实现状态 |
+|------|------|------|------|---------|
+| `period` | string | ❌ | 统计周期: `today`/`week`/`month`/`all`(默认all) | ⚠️ 计划实现，当前返回全部统计 |
+| `detailed` | boolean | ❌ | 是否返回详细统计 (默认false) | ⚠️ 计划实现，当前返回基础统计 |
+
+> 注意：当前实现不支持查询参数，统一返回所有时间段的基础统计数据。
 
 **响应**:
 ```json
@@ -332,6 +510,24 @@ Authorization: Bearer <外部API Token>
   }
 }
 ```
+
+**响应参数说明**:
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `success` | boolean | 请求是否成功 |
+| `data` | object | 统计数据对象 |
+| `data.total` | number | 通知总数 |
+| `data.unread` | number | 未读通知数量 |
+| `data.read` | number | 已读通知数量 |
+| `data.today` | number | 今日收到的通知数量 |
+| `data.unreadByType` | object | 各类型未读通知的统计 |
+| `data.unreadByType.info` | number | 信息类型未读通知数量 |
+| `data.unreadByType.warning` | number | 警告类型未读通知数量 |
+| `data.unreadByType.error` | number | 错误类型未读通知数量 |
+| `data.unreadByType.success` | number | 成功类型未读通知数量 |
+| `data.unreadByPriority` | object | 各优先级未读通知的统计（详细模式） |
+| `data.timeDistribution` | object | 时间分布统计（详细模式） |
 
 ### 🔧 集成示例
 
@@ -481,6 +677,33 @@ curl -X POST https://huisheen.com/api/notifications/receive \
   }
 }
 ```
+
+> 注意：当前实现通常只返回简化版的错误响应，包含`error`字段。完整的错误详情格式将在后续版本中实现。
+
+**错误响应参数说明**:
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `error` | string | 错误描述信息 |
+| `code` | string | 错误代码，用于客户端识别错误类型 |
+| `details` | object/array | 详细错误信息，可能是对象或数组 |
+| `details.field` | string | 出错的字段名称（验证错误时） |
+| `details.message` | string | 该字段的具体错误信息 |
+| `timestamp` | string | 错误发生的时间戳（可选） |
+| `path` | string | 发生错误的API路径（可选） |
+
+**常见错误代码**:
+
+| 错误代码 | 说明 |
+|---------|------|
+| `INVALID_PARAMETERS` | 请求参数验证失败 |
+| `AUTHENTICATION_FAILED` | 认证失败 |
+| `INVALID_TOKEN` | 无效的Token |
+| `TOKEN_EXPIRED` | Token已过期 |
+| `RESOURCE_NOT_FOUND` | 请求的资源不存在 |
+| `PERMISSION_DENIED` | 权限不足 |
+| `RATE_LIMIT_EXCEEDED` | 超出请求频率限制 |
+| `INTERNAL_ERROR` | 服务器内部错误 |
 
 ### ⚡ 使用建议
 
