@@ -346,6 +346,48 @@ createApp({
                 
                 return text;
             };
+        },
+        
+        // 预估存储容量
+        estimatedStorage() {
+            if (!this.user || !this.user.storageUsage) {
+                return { notification: 0, subscription: 0 };
+            }
+            
+            const remainingSize = this.user.storageUsage.total.remainingSize; // 单位：字节
+            let notificationEstimate = 0;
+            let subscriptionEstimate = 0;
+            
+            // 计算通知预估数量
+            if (this.notifications && this.notifications.length > 0 && this.user.storageUsage.notifications.size > 0) {
+                // 1. 当已有至少一条通知时，以已有通知占用的平均值作为推算
+                const avgNotificationSize = this.user.storageUsage.notifications.size / this.notifications.length;
+                notificationEstimate = Math.floor(remainingSize / avgNotificationSize);
+            } else {
+                // 2. 当不存在通知时，以500条通知每MB作为基准
+                const bytesPerMB = 1024 * 1024;
+                notificationEstimate = Math.floor(remainingSize / bytesPerMB * 500);
+            }
+            
+            // 计算订阅预估数量
+            if (this.subscriptions && this.subscriptions.length > 0 && this.user.storageUsage.subscriptions.size > 0) {
+                // 3. 当已有至少一个订阅时，以已有订阅的占用平均值作为推算
+                const avgSubscriptionSize = this.user.storageUsage.subscriptions.size / this.subscriptions.length;
+                subscriptionEstimate = Math.floor(remainingSize / avgSubscriptionSize);
+            } else {
+                // 4. 当不存在订阅时，以每个订阅0.6KB作为基准
+                const bytesPerSubscription = 0.6 * 1024; // 0.6KB转换为字节
+                subscriptionEstimate = Math.floor(remainingSize / bytesPerSubscription);
+            }
+            
+            // 避免结果太大，超过合理范围
+            notificationEstimate = Math.min(notificationEstimate, 1000000); // 限制最大预估为100万条
+            subscriptionEstimate = Math.min(subscriptionEstimate, 100000); // 限制最大预估为10万个
+            
+            return {
+                notification: notificationEstimate.toLocaleString(),
+                subscription: subscriptionEstimate.toLocaleString()
+            };
         }
     },
     
@@ -354,9 +396,7 @@ createApp({
         this.initDarkMode();
         
         // 设置初始页面标题
-        document.title = this.currentLanguage === 'zh' 
-            ? '回声 (Huisheen) - 通知接收平台' 
-            : 'Huisheen (Echo) - Notification Platform';
+        document.title = this.t.common.appTitle;
         
         // 如果有token，先尝试加载用户数据，然后初始化路由
         if (this.token) {
@@ -541,13 +581,10 @@ createApp({
                 this.closeAllDropdowns();
                 
                 // 动态更新页面标题
-                document.title = this.currentLanguage === 'zh' 
-                    ? '回声 (Huisheen) - 通知接收平台' 
-                    : 'Huisheen (Echo) - Notification Platform';
+                document.title = this.t.common.appTitle;
                 
                 // 显示切换成功消息
-                const message = lang === 'zh' ? '已切换到中文' : 'Switched to English';
-                this.showMessage(message);
+                this.showMessage(this.t.common.languageSwitched);
                 
                 // 如果在文档页面，重新加载文档
                 if (this.isDocsPage) {
@@ -1427,7 +1464,7 @@ createApp({
                 
                 // 检查日期是否有效
                 if (isNaN(date.getTime())) {
-                    return this.currentLanguage === 'zh' ? '时间格式错误' : 'Invalid time format';
+                    return this.t.common.timeFormatError;
                 }
                 
                 const now = new Date();
@@ -1444,7 +1481,7 @@ createApp({
                 return date.toLocaleString(this.currentLanguage === 'zh' ? 'zh-CN' : 'en-US');
             } catch (error) {
                 console.error('Time formatting error:', error, timestamp);
-                return this.currentLanguage === 'zh' ? '时间错误' : 'Time error';
+                return this.t.common.timeError;
             }
         },
         
@@ -1470,22 +1507,22 @@ createApp({
         getStorageUsageLevel(percentage) {
             if (percentage < 30) {
                 return {
-                    text: this.currentLanguage === 'zh' ? '使用量较低' : 'Low usage',
+                    text: this.t.storage.usageLevels.low,
                     color: 'text-green-600 dark:text-green-400'
                 };
             } else if (percentage < 60) {
                 return {
-                    text: this.currentLanguage === 'zh' ? '使用量适中' : 'Moderate usage',
+                    text: this.t.storage.usageLevels.moderate,
                     color: 'text-blue-600 dark:text-blue-400'
                 };
             } else if (percentage < 80) {
                 return {
-                    text: this.currentLanguage === 'zh' ? '使用量较高' : 'High usage',
+                    text: this.t.storage.usageLevels.high,
                     color: 'text-yellow-600 dark:text-yellow-400'
                 };
             } else {
                 return {
-                    text: this.currentLanguage === 'zh' ? '使用量很高' : 'Very high usage',
+                    text: this.t.storage.usageLevels.veryHigh,
                     color: 'text-red-600 dark:text-red-400'
                 };
             }

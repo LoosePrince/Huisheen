@@ -41,7 +41,11 @@ const i18n = {
             justNow: '刚刚',
             minutesAgo: '分钟前',
             hoursAgo: '小时前',
-            daysAgo: '天前'
+            daysAgo: '天前',
+            timeFormatError: '时间格式错误',
+            timeError: '时间错误',
+            appTitle: '回声 (Huisheen) - 通知接收平台',
+            languageSwitched: '已切换到中文'
         },
         
         // 导航
@@ -286,6 +290,8 @@ const i18n = {
                 subscriptionsStorage: '订阅数据',
                 totalUsage: '总使用量',
                 remaining: '剩余',
+                estimatedCapacity: '预估可储存',
+                notificationsOr: '条通知或',
                 usageDetails: '使用详情',
                 notifications: '条通知',
                 subscriptions: '个订阅',
@@ -459,6 +465,16 @@ const i18n = {
             },
             noUnreadNotifications: '没有未读通知',
             markedNotificationsAsRead: '已标记 {count} 条通知为已读'
+        },
+        
+        // 存储使用相关
+        storage: {
+            usageLevels: {
+                low: '使用量较低',
+                moderate: '使用量适中',
+                high: '使用量较高',
+                veryHigh: '使用量很高'
+            }
         }
     },
     
@@ -503,7 +519,11 @@ const i18n = {
             justNow: 'Just now',
             minutesAgo: 'minutes ago',
             hoursAgo: 'hours ago',
-            daysAgo: 'days ago'
+            daysAgo: 'days ago',
+            timeFormatError: 'Invalid time format',
+            timeError: 'Time error',
+            appTitle: 'Huisheen (Echo) - Notification Platform',
+            languageSwitched: 'Switched to English'
         },
         
         // Navigation
@@ -748,6 +768,8 @@ const i18n = {
                 subscriptionsStorage: 'Subscriptions Storage',
                 totalUsage: 'Total Usage',
                 remaining: 'Remaining',
+                estimatedCapacity: 'Est. capacity for',
+                notificationsOr: 'notifications or',
                 usageDetails: 'Usage Details',
                 notifications: 'notifications',
                 subscriptions: 'subscriptions',
@@ -760,7 +782,7 @@ const i18n = {
                 verifyEmailForStorage: 'Verify your email to get an extra 1MB storage space and unlock service provider bonus',
                 provideServiceForStorage: 'Provide service to get extra storage space! Each service adds 5MB, up to 2 services',
                 totalStorageLimit: 'Total Storage Limit',
-                betaStorageNotice: 'Current testing phase, no storage usage limit. Official version will provide larger storage space and management features.',
+                betaStorageNotice: 'We are currently in beta and do not enforce storage limits. The official version will provide more storage space and management features.',
                 // Email verification related
                 emailVerification: 'Email Verification',
                 emailStatus: 'Email Status',
@@ -921,6 +943,16 @@ const i18n = {
             },
             noUnreadNotifications: 'No unread notifications',
             markedNotificationsAsRead: 'Marked {count} notifications as read'
+        },
+        
+        // 存储使用相关
+        storage: {
+            usageLevels: {
+                low: 'Low usage',
+                moderate: 'Moderate usage',
+                high: 'High usage',
+                veryHigh: 'Very high usage'
+            }
         }
     }
 };

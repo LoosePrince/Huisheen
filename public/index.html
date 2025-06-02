@@ -1290,6 +1290,9 @@
                                         <div class="flex items-center space-x-2">
                                             <span class="text-xs text-gray-500 dark:text-gray-400">
                                                 {{ t.user.settings.remaining }}: {{ formatSize(user.storageUsage.total.remainingSize) }}
+                                                <span v-if="estimatedStorage.notification || estimatedStorage.subscription">
+                                                    ({{ t.user.settings.estimatedCapacity }}: {{ estimatedStorage.notification }} {{ t.user.settings.notificationsOr }} {{ estimatedStorage.subscription }} {{ t.user.settings.subscriptions }})
+                                                </span>
                                             </span>
                                             <button @click="showStorageLimitInfo = true" 
                                                     class="w-5 h-5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center hover:bg-blue-200 dark:hover:bg-blue-800 transition" 
@@ -1312,7 +1315,7 @@
                                                     {{ t.user.settings.notificationsStorage }}
                                                 </span>
                                                 <span class="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 px-2 py-1 rounded">
-                                                    {{ user.storageUsage.notifications.count }}{{ t.user.settings.notifications }}
+                                                    {{ user.storageUsage.notifications.count }} {{ t.user.settings.notifications }}
                                                 </span>
                                             </div>
                                             <div class="text-sm text-gray-600 dark:text-gray-300">
@@ -1333,7 +1336,7 @@
                                                     {{ t.user.settings.subscriptionsStorage }}
                                                 </span>
                                                 <span class="text-xs bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 px-2 py-1 rounded">
-                                                    {{ user.storageUsage.subscriptions.count }}{{ t.user.settings.subscriptions }}
+                                                    {{ user.storageUsage.subscriptions.count }} {{ t.user.settings.subscriptions }}
                                                 </span>
                                             </div>
                                             <div class="text-sm text-gray-600 dark:text-gray-300">
