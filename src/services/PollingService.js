@@ -35,7 +35,7 @@ class PollingService {
     console.log('轮询服务已停止');
   }
 
-  // 检查并执行轮询
+  // 检查并执行轮询 - 优化版本，按serviceHost分组
   async checkAndPoll() {
     try {
       const now = new Date();
@@ -52,15 +52,111 @@ class PollingService {
         ]
       }).populate('userId');
 
+      // 按serviceHost分组
+      const serviceGroups = new Map();
+      
+      // 对订阅进行分组
       for (const subscription of subscriptions) {
-        const shouldPoll = this.shouldPollSubscription(subscription, now);
+        const serviceHost = subscription.serviceHost;
         
-        if (shouldPoll) {
-          await this.pollSubscription(subscription);
+        if (!serviceGroups.has(serviceHost)) {
+          serviceGroups.set(serviceHost, {
+            apiEndpoint: subscription.apiEndpoint,
+            subscriptions: [],
+            shouldPoll: false,
+            minPollingInterval: Infinity
+          });
+        }
+        
+        const group = serviceGroups.get(serviceHost);
+        group.subscriptions.push(subscription);
+        
+        // 检查该订阅是否应该被轮询
+        const shouldPollThisSubscription = this.shouldPollSubscription(subscription, now);
+        if (shouldPollThisSubscription) {
+          group.shouldPoll = true;
+        }
+        
+        // 记录最小的轮询间隔，用于更新所有订阅的lastPolled时间
+        if (subscription.pollingInterval < group.minPollingInterval) {
+          group.minPollingInterval = subscription.pollingInterval;
+        }
+      }
+      
+      // 对每个服务组执行一次轮询
+      for (const [serviceHost, group] of serviceGroups.entries()) {
+        if (group.shouldPoll) {
+          console.log(`轮询服务组: ${serviceHost}，共有 ${group.subscriptions.length} 个订阅`);
+          await this.pollServiceGroup(group, now);
         }
       }
     } catch (error) {
       console.error('轮询检查错误:', error);
+    }
+  }
+
+  // 轮询服务组（一个serviceHost的所有订阅）
+  async pollServiceGroup(group, now) {
+    try {
+      // 为组内所有订阅更新最后轮询时间
+      const updatePromises = group.subscriptions.map(async subscription => {
+        subscription.lastPolled = now;
+        return subscription.save();
+      });
+      
+      await Promise.all(updatePromises);
+      
+      // 只执行一次HTTP请求
+      const response = await axios.get(group.apiEndpoint, {
+        timeout: 30000, // 30秒超时
+        headers: {
+          'User-Agent': 'Huisheen-Polling-Service/1.0',
+          'Accept': 'application/json'
+        }
+      });
+      
+      // 处理响应数据，将结果分发给所有订阅
+      await this.processGroupPollingResponse(group.subscriptions, response.data);
+      
+    } catch (error) {
+      console.error(`服务组轮询错误 (${group.apiEndpoint}):`, error.message);
+      // 可以在这里记录错误或发送错误通知
+      if (error.response) {
+        console.error(`HTTP状态码: ${error.response.status}`);
+      }
+    }
+  }
+  
+  // 处理服务组的轮询响应，将结果分发给所有订阅
+  async processGroupPollingResponse(subscriptions, data) {
+    try {
+      // 根据标准化格式处理数据
+      let notifications = [];
+
+      if (Array.isArray(data)) {
+        notifications = data;
+      } else if (data.notifications && Array.isArray(data.notifications)) {
+        notifications = data.notifications;
+      } else if (data.data && Array.isArray(data.data)) {
+        notifications = data.data;
+      } else {
+        // 如果不是数组，将单个对象作为通知处理
+        notifications = [data];
+      }
+      
+      // 为每个订阅处理通知
+      for (const subscription of subscriptions) {
+        let processedCount = 0;
+        
+        for (const notifData of notifications) {
+          const processed = await this.createNotificationFromPolling(subscription, notifData);
+          if (processed) processedCount++;
+        }
+        
+        console.log(`为订阅 ${subscription._id} 处理了 ${processedCount} 条通知`);
+      }
+    } catch (error) {
+      console.error(`处理服务组轮询响应错误:`, error);
     }
   }
 
@@ -76,10 +172,9 @@ class PollingService {
     return now >= nextPollTime;
   }
 
-  // 执行轮询
+  // 执行轮询（仅用于单个订阅的手动触发）
   async pollSubscription(subscription) {
     try {
-
       // 更新最后轮询时间
       subscription.lastPolled = new Date();
       await subscription.save();
@@ -97,7 +192,6 @@ class PollingService {
       await this.processPollingResponse(subscription, response.data);
 
     } catch (error) {
-      
       // 可以在这里记录错误或发送错误通知
       if (error.response) {
         console.error(`HTTP状态码: ${error.response.status}`);
@@ -105,7 +199,7 @@ class PollingService {
     }
   }
 
-  // 处理轮询响应数据
+  // 处理轮询响应数据 - 用于单个订阅的手动触发
   async processPollingResponse(subscription, data) {
     try {
       // 根据标准化格式处理数据
@@ -273,4 +367,6 @@ class PollingService {
   }
 }
 
-module.exports = new PollingService(); 
+// 单例模式
+const pollingService = new PollingService();
+module.exports = pollingService; 
