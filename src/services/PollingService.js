@@ -52,23 +52,23 @@ class PollingService {
         ]
       }).populate('userId');
 
-      // 按serviceHost分组
+      // 按完整API端点URL分组
       const serviceGroups = new Map();
       
       // 对订阅进行分组
       for (const subscription of subscriptions) {
-        const serviceHost = subscription.serviceHost;
+        const apiEndpoint = subscription.apiEndpoint;
         
-        if (!serviceGroups.has(serviceHost)) {
-          serviceGroups.set(serviceHost, {
-            apiEndpoint: subscription.apiEndpoint,
+        if (!serviceGroups.has(apiEndpoint)) {
+          serviceGroups.set(apiEndpoint, {
+            apiEndpoint: apiEndpoint,
             subscriptions: [],
             shouldPoll: false,
             minPollingInterval: Infinity
           });
         }
         
-        const group = serviceGroups.get(serviceHost);
+        const group = serviceGroups.get(apiEndpoint);
         group.subscriptions.push(subscription);
         
         // 检查该订阅是否应该被轮询
@@ -84,9 +84,9 @@ class PollingService {
       }
       
       // 对每个服务组执行一次轮询
-      for (const [serviceHost, group] of serviceGroups.entries()) {
+      for (const [apiEndpoint, group] of serviceGroups.entries()) {
         if (group.shouldPoll) {
-          console.log(`轮询服务组: ${serviceHost}，共有 ${group.subscriptions.length} 个订阅`);
+          console.log(`轮询服务组: ${apiEndpoint}，共有 ${group.subscriptions.length} 个订阅`);
           await this.pollServiceGroup(group, now);
         }
       }
